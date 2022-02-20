@@ -1,5 +1,5 @@
 # make-ca
 
-Makefile for creating and managing a 2-tier certificate authority
+Makefile for creating and managing a 3-tier certificate authority
 
 Work in progress.
