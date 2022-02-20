@@ -273,7 +273,7 @@ $(WEBDIR)/%-ca.pem: $(CA_DIR)/certs/%-ca.crt
 $(WEBDIR)/%-ca-chain.p7c: $(WEBDIR)/%-ca-chain.pem
 	@$(OPENSSL) crl2pkcs7 -nocrl \
 		-certfile $(WEBDIR)/$*-ca-chain.pem \
-    	-out $(WEBDIR)/$*-ca-chain.p7c -outform DER
+		-out $(WEBDIR)/$*-ca-chain.p7c -outform DER
 
 # create PEM certificate chain for ca
 $(WEBDIR)/%-ca-chain.pem: $(WEBDIR)/%-ca.pem
