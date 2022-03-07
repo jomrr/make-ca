@@ -3,36 +3,38 @@
 # ******************************************************************************
 # configuration variables
 # ******************************************************************************
-SHELL := /usr/bin/env bash
-OPENSSL := /usr/bin/openssl
+SHELL			:= /usr/bin/env bash
+OPENSSL			:= /usr/bin/openssl
 
 # CA Keys: param for openssl genpkey -algorithm $(CAK_ALG)
-CAK_ALG ?= ED25519
-#CAK_ALG ?= RSA -pkeyopt rsa_keygen_bits:4096
+#CAK_ALG			?= ED25519
+CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:4096
 
 # CRT Keys: param for openssl req -newkey $(KEY_ALG)
 # NOTE: ED25519 p12 client certificates fail to import with Firefox 97.0
-KEY_ALG ?= ED25519
-#KEY_ALG ?= RSA:4096
+#KEY_ALG			?= ED25519
+KEY_ALG			?= RSA:4096
 
-CA_DIR := ca	# ca base directory
-CRTDIR := dist	# certificate distribution directory, where CRTs are created
-CNFDIR := etc	# directory for openssl configuration files
-WEBDIR := www	# webroot, where CRLs, chains, etc. are placed
+CA_DIR			:= ca	# ca base directory
+CRTDIR			:= dist	# certificate distribution directory for CRTs
+CNFDIR			:= etc	# directory for openssl configuration files
+WEBDIR			:= www	# webroot, where CRLs, chains, etc. are placed
 
 # list of signing CAs, signed by intermediate
-SIGNING_CA := component identity
-ALL_CA := root intermediate $(SIGNING_CA)
+SIGNING_CA		:= component identity
+ALL_CA			:= root intermediate $(SIGNING_CA)
 
-ALL_CA_CONFIGS := $(wildcard $(CNFDIR)/*-ca.cnf)
-PREDEF_CONFIGS := $(CNFDIR)/client.cnf $(CNFDIR)/email.cnf $(CNFDIR)/fritzbox.cnf $(CNFDIR)/identity.cnf $(CNFDIR)/server.cnf $(CNFDIR)/smartcard.cnf
-FILTER_CONFIGS := $(ALL_CA_CONFIGS) #$(PREDEF_CONFIGS)
-CONFIG_TARGETS := $(filter-out $(FILTER_CONFIGS),$(wildcard $(CNFDIR)/*.cnf))
+ALL_CA_CONFIGS	:= $(wildcard $(CNFDIR)/*-ca.cnf)
+PREDEF_CONFIGS	:= $(CNFDIR)/client.cnf $(CNFDIR)/email.cnf
+PREDEF_CONFIGS	+= $(CNFDIR)/fritzbox.cnf $(CNFDIR)/identity.cnf
+PREDEF_CONFIGS	+= $(CNFDIR)/server.cnf $(CNFDIR)/smartcard.cnf
+FILTER_CONFIGS	:= $(ALL_CA_CONFIGS) #$(PREDEF_CONFIGS)
+CONFIG_TARGETS	:= $(filter-out $(FILTER_CONFIGS),$(wildcard $(CNFDIR)/*.cnf))
 
 # base URL of pki, where WEBDIR is found, also used as AIA and CDP base
-export PKIURL := http://pki.mauer.in
+export PKIURL	:= http://pki.mauer.in
 # list of CRL Distribution Points in SSH syntax for deploy-crls target (TODO)
-CDP := cdp1:/var/www/pki
+CDP				:= cdp1:/var/www/pki
 
 # ******************************************************************************
 # functions
@@ -81,13 +83,6 @@ endef
 # make settings
 # ******************************************************************************
 
-# targets that always run, when called
-.PHONY: \
-	init root intermediate $(SIGNING_CA) \
-	--revoke $(CONFIG_TARGETS) FORCE help \
-	destroy gencrls print revoke-component revoke-identity \
-	client fritzbox identity nitrokey server smartcard
-
 # keep these files
 .PRECIOUS: \
 	$(CA_DIR)/certs/%-ca.crt \
@@ -114,6 +109,7 @@ endef
 # help and usage
 # ==============================================================================
 
+.PHONY: help
 help:
 	@echo "Help!"
 
@@ -122,6 +118,7 @@ help:
 # ==============================================================================
 
 # --- create CRT from existing static configuration file without prompting -----
+.PHONY: $(CONFIG_TARGETS)
 $(CONFIG_TARGETS):
 # TODO
 
@@ -153,32 +150,41 @@ $(CRTDIR)/%.p12: $(CRTDIR)/%.crt
 $(CRTDIR)/%.pem: $(CRTDIR)/%.crt
 	@cat $(CRTDIR)/$*.key $(CRTDIR)/$*.crt $(WEBDIR)/$(CA)-ca-chain.pem > $@
 
-# --- create tls client certificate and ask for DN -----------------------------
+# --- create tls client certificate --------------------------------------------
+.PHONY: client
 client: $(eval CA=component KEY_ALG=RSA:4096) $(CRTDIR)/$(CN).p12
 
-# --- create tls certificate for fritzbox and do not ask for DN ----------------
+# --- create tls certificate for fritzbox --------------------------------------
+.PHONY: fritzbox
 fritzbox: $(eval CA=component) $(CRTDIR)/fritz.box.pem
 
+# --- generate CRLs for all CAs ------------------------------------------------
+.PHONY: gencrls
 gencrls: $(foreach ca,$(ALL_CA),$(WEBDIR)/$(ca)-ca.crl)
 
 # --- factory-reset, configure nitrokey and upload s/mime certificate ----------
+.PHONY: nitrokey
 nitrokey:
 # TODO
 
-# --- create tls server certificate and ask for DN, SAN as ENV -----------------
-server: $(eval CA=component) $(CRTDIR)/$(CN).crt
+# --- create tls server certificate --------------------------------------------
+.PHONY: server
+server: $(eval CA=component) $(CRTDIR)/$(CN).pem
 
-# --- create s/mime certificate for smartcard and ask for DN -------------------
+# --- create s/mime certificate for smartcard ----------------------------------
+.PHONY: smartcard
 smartcard:
 # TODO
 
 # --- print CA db files with CA name for grepping serials, revoked, etc. -------
+.PHONY: print
 print:
 	@find $(CA_DIR)/db/ -type f -name "*.db" -exec grep -H ^ {} + | \
 		sed 's/.*\/\(.*\)\.db:\(.*\)\/C=.*CN=\(.*\)/\2CN="\3" \1/' | \
 		tr '\t' ' ' | sort
 
 # --- invisible target to revoke a certificate by CN= --------------------------
+.PHONY: --revoke
 --revoke:
 	@$(OPENSSL) ca -batch \
 		-config $(CNFDIR)/$(CA)-ca.cnf \
@@ -188,9 +194,11 @@ print:
 	@rm -f $(CRTDIR)/$(CN).{crt,p12,pem}
 
 # --- revoke CRT by Component CA and rebuild its CRL ---------------------------
+.PHONY: revoke-component
 revoke-component: $(eval CA=component) --revoke $(WEBDIR)/$(CA)-ca.crl
 
 # --- revoke CRT by Identity CA and rebuild its CRL ----------------------------
+.PHONY: revoke-identity
 revoke-identity: $(eval CA=identity) --revoke $(WEBDIR)/$(CA)-ca.crl
 
 # ==============================================================================
@@ -198,20 +206,25 @@ revoke-identity: $(eval CA=identity) --revoke $(WEBDIR)/$(CA)-ca.crl
 # ==============================================================================
 
 # delete everything but make and the config dir
+.PHONY: destroy
 destroy:
 	@rm -Ir $(CA_DIR)/ $(CRTDIR)/ $(WEBDIR)/
 
 # init all CAs and generate initial CRLs
+.PHONY: init
 init: $(SIGNING_CA) gencrls
 
 # init root ca
+.PHONY: root
 root: %: $(CA_DIR)/db/%-ca.db $(WEBDIR)/%-ca.cer
 
 # init intermediate ca, depends on root ca, so root will run if necessary
+.PHONY: intermediate
 intermediate: %: root \
 	$(CA_DIR)/db/%-ca.db $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c
 
 # init signing CAs, depends on intermediate and implicitly on root
+.PHONY: $(SIGNING_CA)
 $(SIGNING_CA): %: intermediate \
 	$(CA_DIR)/db/%-ca.db $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c
 
@@ -284,6 +297,7 @@ $(WEBDIR)/%-ca-chain.pem: $(WEBDIR)/%-ca.pem
 # ==============================================================================
 
 # forces a target to run, if used as depency
+.PHONY: FORCE
 FORCE: ;
 
 # catch all unkown targets and inform
