@@ -8,12 +8,12 @@ OPENSSL			:= /usr/bin/openssl
 
 # CA Keys: param for openssl genpkey -algorithm $(CAK_ALG)
 #CAK_ALG			?= ED25519
-CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:4096
+CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:8192
 
 # CRT Keys: param for openssl req -newkey $(KEY_ALG)
 # NOTE: ED25519 p12 client certificates fail to import with Firefox 97.0
-#KEY_ALG			?= ED25519
-KEY_ALG			?= RSA:4096
+KEY_ALG			?= ED25519
+#KEY_ALG			?= RSA:4096
 
 CA_DIR			:= ca	# ca base directory
 CRTDIR			:= dist	# certificate distribution directory for CRTs
@@ -267,7 +267,8 @@ $(WEBDIR)/%-ca.cer: $(WEBDIR)/%-ca.pem
 		-outform DER
 
 # create crl for ca and force it to run
-$(WEBDIR)/%-ca.crl: FORCE
+.PHONY: $(WEBDIR)/%-ca.crl
+$(WEBDIR)/%-ca.crl:
 	@$(OPENSSL) ca -gencrl \
 		-config $(CNFDIR)/$*-ca.cnf \
 		-passin file:$(CA_DIR)/private/$*-ca.pwd \
@@ -295,10 +296,6 @@ $(WEBDIR)/%-ca-chain.pem: $(WEBDIR)/%-ca.pem
 # ==============================================================================
 # general purpose targets
 # ==============================================================================
-
-# forces a target to run, if used as depency
-.PHONY: FORCE
-FORCE: ;
 
 # catch all unkown targets and inform
 %:
