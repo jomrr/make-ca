@@ -1,5 +1,8 @@
 # Makefile for operating a certificate authority
 
+# todo:
+# - do not gen crl, if db is empty > newer openssl errors with "no value"
+
 # ******************************************************************************
 # configuration variables
 # ******************************************************************************
@@ -7,18 +10,22 @@ SHELL			:= /usr/bin/env bash
 OPENSSL			:= /usr/bin/openssl
 
 # CA Keys: param for openssl genpkey -algorithm $(CAK_ALG)
-#CAK_ALG			?= ED25519
-CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:8192
+CAK_ALG			?= ED25519
+#CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:8192
 
 # CRT Keys: param for openssl req -newkey $(KEY_ALG)
 # NOTE: ED25519 p12 client certificates fail to import with Firefox 97.0
 KEY_ALG			?= ED25519
 #KEY_ALG			?= RSA:4096
 
-CA_DIR			:= ca	# ca base directory
-CRTDIR			:= dist	# certificate distribution directory for CRTs
-CNFDIR			:= etc	# directory for openssl configuration files
-WEBDIR			:= www	# webroot, where CRLs, chains, etc. are placed
+# ca base directory
+CA_DIR			:= ca
+# certificate distribution directory for CRTs
+CRTDIR			:= dist
+# directory for openssl configuration files
+CNFDIR			:= etc
+# webroot, where CRLs, chains, etc. are placed
+WEBDIR			:= www
 
 # list of signing CAs, signed by intermediate
 SIGNING_CA		:= component identity
