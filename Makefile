@@ -1,8 +1,5 @@
 # Makefile for operating a certificate authority
 
-# todo:
-# - do not gen crl, if db is empty > newer openssl errors with "no value"
-
 # ******************************************************************************
 # configuration variables
 # ******************************************************************************
@@ -10,8 +7,8 @@ SHELL			:= /usr/bin/env bash
 OPENSSL			:= /usr/bin/openssl
 
 # CA Keys: param for openssl genpkey -algorithm $(CAK_ALG)
-CAK_ALG			?= ED25519
-#CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:8192
+#CAK_ALG			?= ED25519
+CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:8192
 
 # CRT Keys: param for openssl req -newkey $(KEY_ALG)
 # NOTE: ED25519 p12 client certificates fail to import with Firefox 97.0
@@ -219,21 +216,22 @@ destroy:
 
 # init all CAs and generate initial CRLs
 .PHONY: init
-init: $(SIGNING_CA) gencrls
+init: $(SIGNING_CA)
 
 # init root ca
 .PHONY: root
 root: %: $(CA_DIR)/db/%-ca.db $(WEBDIR)/%-ca.cer
 
 # init intermediate ca, depends on root ca, so root will run if necessary
-.PHONY: intermediate
+.PHONY: intermediate $(WEBDIR)/root-ca.crl
 intermediate: %: root \
 	$(CA_DIR)/db/%-ca.db $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c
 
 # init signing CAs, depends on intermediate and implicitly on root
 .PHONY: $(SIGNING_CA)
 $(SIGNING_CA): %: intermediate \
-	$(CA_DIR)/db/%-ca.db $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c
+	$(CA_DIR)/db/%-ca.db $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c \
+	$(WEBDIR)/intermediate-ca.crl
 
 # issue ca certificate
 $(CA_DIR)/certs/%-ca.crt: $(CA_DIR)/reqs/%-ca.csr
