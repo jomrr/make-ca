@@ -210,13 +210,15 @@ revoke-identity: $(eval CA ?= identity) --revoke $(WEBDIR)/$(CA)-ca.crl
 # targets for initializing or destroying the CAs
 # ==============================================================================
 
+# delete CSRs
 .PHONY: clean
 clean:
 	@rm dist/$(CN).csr
 
+# delete KEYs and CERTs
 .PHONY: distclean
 distclean: clean
-	@rm dist/$(CN).{key,crt}
+	@rm dist/$(CN).{crt,key,pem,p12}
 
 # delete everything but make and the config dir
 .PHONY: destroy
