@@ -1,6 +1,8 @@
 # TLS certificate request for AVM FritzBox
 [ default ]
+CN                      = fritz.box
 FBSAN = DNS:fritz.box,DNS:www.fritz.box,DNS:myfritz.box,DNS:www.myfritz.box,DNS:fritz.nas,DNS:www.fritz.nas
+SAN                     = DNS:${CN}
 
 [ req ]
 default_bits            = 4096                  # RSA key size

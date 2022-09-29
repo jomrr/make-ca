@@ -3,7 +3,7 @@
 # ******************************************************************************
 # configuration variables
 # ******************************************************************************
-SHELL			:= /usr/bin/env bash
+SHELL			:= bash
 OPENSSL			:= /usr/bin/openssl
 
 # CA Keys: param for openssl genpkey -algorithm $(CAK_ALG)
@@ -134,6 +134,7 @@ $(CRTDIR)/%.csr:
 
 # --- issue CRT by CA ----------------------------------------------------------
 $(CRTDIR)/%.crt: $(CRTDIR)/%.csr
+	@echo CA=$(CA)
 	@$(OPENSSL) ca -batch -notext -create_serial \
 		-config $(CNFDIR)/$(CA)-ca.cnf \
 		-in $< \
@@ -156,11 +157,11 @@ $(CRTDIR)/%.pem: $(CRTDIR)/%.crt
 
 # --- create tls client certificate --------------------------------------------
 .PHONY: client
-client: $(eval CA=component KEY_ALG=RSA:4096) $(CRTDIR)/$(CN).p12
+client: $(CA := component KEY_ALG=RSA:4096) $(CRTDIR)/$(CN).p12
 
 # --- create tls certificate for fritzbox --------------------------------------
 .PHONY: fritzbox
-fritzbox: $(eval CA=component) $(CRTDIR)/fritz.box.pem
+fritzbox: $(CA := component) $(CRTDIR)/fritz.box.pem
 
 # --- generate CRLs for all CAs ------------------------------------------------
 .PHONY: gencrls
@@ -173,7 +174,7 @@ nitrokey:
 
 # --- create tls server certificate --------------------------------------------
 .PHONY: server
-server: $(eval CA=component) $(CRTDIR)/$(CN).pem
+server: $(CA := component) $(CRTDIR)/$(CN).pem
 
 # --- create s/mime certificate for smartcard ----------------------------------
 .PHONY: smartcard
@@ -195,19 +196,27 @@ print:
 		-revoke $(CRTDIR)/$(CN).crt \
 		-passin file:$(CA_DIR)/private/$(CA)-ca.pwd \
 		-crl_reason $(if $(REASON),$(REASON),superseded)
-	@rm -f $(CRTDIR)/$(CN).{crt,p12,pem}
+	@rm -f $(CRTDIR)/$(CN).*
 
 # --- revoke CRT by Component CA and rebuild its CRL ---------------------------
 .PHONY: revoke-component
-revoke-component: $(eval CA=component) --revoke $(WEBDIR)/$(CA)-ca.crl
+revoke-component: $(eval CA ?= component) --revoke $(WEBDIR)/$(CA)-ca.crl
 
 # --- revoke CRT by Identity CA and rebuild its CRL ----------------------------
 .PHONY: revoke-identity
-revoke-identity: $(eval CA=identity) --revoke $(WEBDIR)/$(CA)-ca.crl
+revoke-identity: $(eval CA ?= identity) --revoke $(WEBDIR)/$(CA)-ca.crl
 
 # ==============================================================================
 # targets for initializing or destroying the CAs
 # ==============================================================================
+
+.PHONY: clean
+clean:
+	@rm dist/$(CN).csr
+
+.PHONY: distclean
+distclean: clean
+	@rm dist/$(CN).{key,crt}
 
 # delete everything but make and the config dir
 .PHONY: destroy

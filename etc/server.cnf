@@ -1,4 +1,7 @@
 # TLS server certificate request
+[ default ]
+CN                      = ${ENV::HOSTNAME}
+SAN                     = DNS:${CN}
 
 [ req ]
 default_bits            = 4096                  # RSA key size
