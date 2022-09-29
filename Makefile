@@ -12,8 +12,8 @@ CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:8192
 
 # CRT Keys: param for openssl req -newkey $(KEY_ALG)
 # NOTE: ED25519 p12 client certificates fail to import with Firefox 97.0
-KEY_ALG			?= ED25519
-#KEY_ALG			?= RSA:4096
+#KEY_ALG			?= ED25519
+KEY_ALG			?= RSA:4096
 
 # ca base directory
 CA_DIR			:= ca
