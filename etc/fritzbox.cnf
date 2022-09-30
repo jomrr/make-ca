@@ -1,8 +1,8 @@
 # TLS certificate request for AVM FritzBox
 [ default ]
 CN                      = fritz.box
-FBSAN = DNS:fritz.box,DNS:www.fritz.box,DNS:myfritz.box,DNS:www.myfritz.box,DNS:fritz.nas,DNS:www.fritz.nas
 SAN                     = DNS:${CN}
+FBSAN = DNS:fritz.box,DNS:www.fritz.box,DNS:myfritz.box,DNS:www.myfritz.box,DNS:fritz.nas,DNS:www.fritz.nas
 
 [ req ]
 default_bits            = 4096                  # RSA key size
@@ -20,7 +20,7 @@ stateOrProvinceName     = Bayern
 localityName            = Erlangen
 organizationName        = HomeBase
 organizationalUnitName  = HomeBase PKI
-commonName              = fritz.box
+commonName              = ${CN}
 
 [ fritzbox_reqext ]
 keyUsage                = critical,digitalSignature,keyEncipherment
