@@ -5,9 +5,9 @@ SAN                     = DNS:${CN}
 FBSAN = DNS:fritz.box,DNS:www.fritz.box,DNS:myfritz.box,DNS:www.myfritz.box,DNS:fritz.nas,DNS:www.fritz.nas
 
 [ req ]
-default_bits            = 4096                  # RSA key size
+default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
 encrypt_key             = no                    # Protect private key
-default_md              = sha512                # MD to use
+default_md              = ${ENV::DEFAULT_MD}    # MD to use
 utf8                    = yes                   # Input is UTF-8
 string_mask             = utf8only              # Emit UTF-8 strings
 prompt                  = no                    # Prompt for DN
@@ -15,11 +15,11 @@ distinguished_name      = fritzbox_dn           # DN template
 req_extensions          = fritzbox_reqext       # Desired extensions
 
 [ fritzbox_dn ]
-countryName             = DE
-stateOrProvinceName     = Bayern
-localityName            = Erlangen
-organizationName        = HomeBase
-organizationalUnitName  = HomeBase PKI
+countryName             = ${ENV::DN_C}
+stateOrProvinceName     = ${ENV::DN_ST}
+localityName            = ${ENV::DN_L}
+organizationName        = ${ENV::DN_O}
+organizationalUnitName  = ${ENV::DN_OU}
 commonName              = ${CN}
 
 [ fritzbox_reqext ]

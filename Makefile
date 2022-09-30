@@ -15,6 +15,17 @@ CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:8192
 #KEY_ALG			?= ED25519
 KEY_ALG			?= RSA:4096
 
+# default RSA bit length in cnf files
+DEFAULT_BITS	?= 4096
+# default settings for hash in cnf files
+DEFAULT_MD		?= sha512
+# distiguished name defaults
+DN_C			?= DE
+DN_ST			?= Bayern
+DN_L			?= Erlangen
+DN_O			?= Mauer
+DN_OU			?= $(DN_O) PKI
+
 # ca base directory
 CA_DIR			:= ca
 # certificate distribution directory for CRTs

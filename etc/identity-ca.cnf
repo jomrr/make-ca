@@ -6,12 +6,12 @@ aia_url                 = $base_url/$ca.cer     # CA certificate URL
 crl_url                 = $base_url/$ca.crl     # CRL distribution point
 name_opt                = ca_default            # Subject name display option
 cert_opt                = ca_default            # Certificate display option
-default_md              = sha512                # default MD to use
+default_md              = ${ENV::DEFAULT_MD}    # default MD to use
 
 # CA certificate request
 
 [ req ]
-default_bits            = 4096                  # RSA key size
+default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
 encrypt_key             = yes                   # Protect private key
 default_md              = $default_md           # MD to use
 utf8                    = yes                   # Input is UTF-8
@@ -21,12 +21,12 @@ distinguished_name      = common_dn             # DN section
 req_extensions          = common_ca_ext         # Desired extensions
 
 [ common_dn ]
-countryName             = DE
-stateOrProvinceName     = Bayern
-localityName            = Erlangen
-organizationName        = HomeBase
-organizationalUnitName  = HomeBase PKI
-commonName              = HomeBase Identity CA
+countryName             = ${ENV::DN_C}
+stateOrProvinceName     = ${ENV::DN_ST}
+localityName            = ${ENV::DN_L}
+organizationName        = ${ENV::DN_O}
+organizationalUnitName  = ${ENV::DN_OU}
+commonName              = ${ENV::DN_O} Identity CA
 
 [ common_ca_ext ]
 keyUsage                = critical,keyCertSign,cRLSign
