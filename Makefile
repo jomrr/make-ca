@@ -6,25 +6,8 @@
 SHELL			:= bash
 OPENSSL			:= /usr/bin/openssl
 
-# CA Keys: param for openssl genpkey -algorithm $(CAK_ALG)
-#CAK_ALG			?= ED25519
-CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:8192
-
-# CRT Keys: param for openssl req -newkey $(KEY_ALG)
-# NOTE: ED25519 p12 client certificates fail to import with Firefox 97.0
-#KEY_ALG			?= ED25519
-KEY_ALG			?= RSA:4096
-
-# default RSA bit length in cnf files
-DEFAULT_BITS	?= 4096
-# default settings for hash in cnf files
-DEFAULT_MD		?= sha512
-# distiguished name defaults
-DN_C			?= DE
-DN_ST			?= Bayern
-DN_L			?= Erlangen
-DN_O			?= Mauer
-DN_OU			?= $(DN_O) PKI
+# ca default settings
+include			settings.mk
 
 # ca base directory
 CA_DIR			:= ca
@@ -45,11 +28,6 @@ PREDEF_CONFIGS	+= $(CNFDIR)/fritzbox.cnf $(CNFDIR)/identity.cnf
 PREDEF_CONFIGS	+= $(CNFDIR)/server.cnf $(CNFDIR)/smartcard.cnf
 FILTER_CONFIGS	:= $(ALL_CA_CONFIGS) #$(PREDEF_CONFIGS)
 CONFIG_TARGETS	:= $(filter-out $(FILTER_CONFIGS),$(wildcard $(CNFDIR)/*.cnf))
-
-# base URL of pki, where WEBDIR is found, also used as AIA and CDP base
-export PKIURL	:= http://pki.mauer.in
-# list of CRL Distribution Points in SSH syntax for deploy-crls target (TODO)
-CDP				:= cdp1:/var/www/pki
 
 # ******************************************************************************
 # functions
