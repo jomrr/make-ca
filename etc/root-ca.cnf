@@ -1,7 +1,8 @@
 [ default ]
 ca                      = root-ca               # Current CA name
 dir                     = ca                    # Top dir
-base_url                = ${ENV::PKIURL}        # CA base URL
+base_url                = ${ENV::BASE_URL}      # CA base URL
+ocsp_url                = ${ENV::OCSP_URL}      # CA OCSP URL
 aia_url                 = $base_url/$ca.cer     # CA certificate URL
 crl_url                 = $base_url/$ca.crl     # CRL distribution point
 name_opt                = ca_default            # Subject name display option
@@ -80,6 +81,7 @@ basicConstraints        = critical,CA:true
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
+authorityInfoAccess     = @ocsp_info
 crlDistributionPoints   = @crl_info
 
 [ crl_ext ]
@@ -91,3 +93,6 @@ caIssuers;URI.0         = $aia_url
 
 [ crl_info ]
 URI.0                   = $crl_url
+
+[ ocsp_info ]
+OCSP;URI.0              = $ocsp_url

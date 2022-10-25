@@ -1,7 +1,8 @@
 [ default ]
 ca                      = component-ca          # Current CA name
 dir                     = ca                    # Top dir
-base_url                = ${ENV::PKIURL}        # CA base URL
+base_url                = ${ENV::BASE_URL}      # CA base URL
+ocsp_url                = ${ENV::OCSP_URL}      # CA OCSP URL
 aia_url                 = $base_url/$ca.cer     # CA certificate URL
 crl_url                 = $base_url/$ca.crl     # CRL distribution point
 name_opt                = ca_default            # Subject name display option
@@ -74,6 +75,7 @@ extendedKeyUsage        = clientAuth,pkInitClientAuth
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 crlDistributionPoints   = @crl_info
+authorityInfoAccess     = @ocsp_info
 
 [ fritzbox_ext ]
 keyUsage                = critical,digitalSignature,keyEncipherment
@@ -81,6 +83,7 @@ extendedKeyUsage        = clientAuth,serverAuth
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 crlDistributionPoints   = @crl_info
+authorityInfoAccess     = @ocsp_info
 
 [ ocsp_ext ]
 keyUsage                = critical,digitalSignature
@@ -88,6 +91,7 @@ extendedKeyUsage        = critical,OCSPSigning
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 crlDistributionPoints   = @crl_info
+authorityInfoAccess     = @ocsp_info
 
 [ server_ext ]
 keyUsage                = critical,digitalSignature,keyEncipherment
@@ -95,6 +99,7 @@ extendedKeyUsage        = clientAuth,serverAuth
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 crlDistributionPoints   = @crl_info
+authorityInfoAccess     = @ocsp_info
 
 [ timestamp_ext ]
 keyUsage                = critical,digitalSignature
@@ -102,6 +107,7 @@ extendedKeyUsage        = critical,timeStamping
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 crlDistributionPoints   = @crl_info
+authorityInfoAccess     = @ocsp_info
 
 [ crl_ext ]
 authorityKeyIdentifier  = keyid:always
@@ -112,3 +118,6 @@ URI.0                   = $crl_url
 
 [ issuer_info ]
 caIssuers;URI.0         = $aia_url
+
+[ ocsp_info ]
+OCSP;URI.0              = $ocsp_url
