@@ -1,7 +1,6 @@
 # TLS server certificate request
 [ default ]
-CN                      = ${ENV::HOSTNAME}
-SAN                     = DNS:${CN}
+SAN                     = DNS:www.${ENV::CN}
 
 [ req ]
 default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
@@ -25,4 +24,4 @@ commonName              = ${ENV::CN}
 keyUsage                = critical,digitalSignature,keyEncipherment
 extendedKeyUsage        = clientAuth,serverAuth
 subjectKeyIdentifier    = hash
-subjectAltName          = ${ENV::SAN}
+subjectAltName          = DNS:${ENV::CN},${ENV::SAN}
