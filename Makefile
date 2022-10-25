@@ -212,7 +212,7 @@ distclean: clean
 # delete everything but make and the config dir
 .PHONY: destroy
 destroy:
-	@rm -Ir $(CA_DIR)/ $(CRTDIR)/ $(WEBDIR)/
+	@rm -Ir ./$(CA_DIR)/ ./$(CRTDIR)/ ./$(WEBDIR)/
 
 # init all CAs and generate initial CRLs
 .PHONY: init
@@ -301,6 +301,17 @@ $(WEBDIR)/%-ca-chain.pem: $(WEBDIR)/%-ca.pem
 # ==============================================================================
 # general purpose targets
 # ==============================================================================
+
+force-destroy:
+	@rm -rf ./$(CA_DIR)/ ./$(CRTDIR)/ ./$(WEBDIR)/
+
+.PHONY: test
+test:
+	$(MAKE) force-destroy
+	CAK_ALG=ED25519 $(MAKE) init
+	KEY_ALG=ED25519 $(MAKE) server CN=test.example.com
+	$(MAKE) force-destroy
+	
 
 # catch all unkown targets and inform
 %:
