@@ -311,7 +311,6 @@ test:
 	CAK_ALG=ED25519 $(MAKE) init
 	KEY_ALG=ED25519 $(MAKE) server CN=test.example.com
 	$(MAKE) force-destroy
-	
 
 # catch all unkown targets and inform
 %:
