@@ -1,5 +1,5 @@
 ################################################################################
-# CA Name settings
+# CA and certificate settings
 ################################################################################
 # distiguished name defaults
 export DN_C				?= DE
@@ -7,6 +7,12 @@ export DN_ST			?= Bayern
 export DN_L				?= Strunzenoed
 export DN_O				?= Example
 export DN_OU			?= $(DN_O) PKI
+# fritzbox.cnf public myfritz name
+export FRITZBOX_PUBLIC	?= wsroikgniugb7373e4t4
+# fritzbox.cnf internal name
+export FRITZBOX_INTERN  ?= MosEisley
+# fritzbox.cnf: IPv4 address
+export FRITZBOX_IP4		?= 10.0.0.1
 ################################################################################
 # CA URL settings
 ################################################################################

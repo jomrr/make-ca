@@ -1,8 +1,6 @@
 # TLS certificate request for AVM FritzBox
 [ default ]
-CN                      = fritz.box
-SAN                     = DNS:${CN}
-FBSAN = DNS:fritz.box,DNS:www.fritz.box,DNS:myfritz.box,DNS:www.myfritz.box,DNS:fritz.nas,DNS:www.fritz.nas
+CN                      = ${ENV::FRITZBOX_PUBLIC}.myfritz.net
 
 [ req ]
 default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
@@ -26,4 +24,15 @@ commonName              = ${CN}
 keyUsage                = critical,digitalSignature,keyEncipherment
 extendedKeyUsage        = clientAuth,serverAuth
 subjectKeyIdentifier    = hash
-subjectAltName          = ${FBSAN},${ENV::SAN}
+subjectAltName          = @fritzbox_san
+
+[ fritzbox_san ]
+DNS.0                   = ${ENV::FRITZBOX_PUBLIC}.myfritz.net
+DNS.1                   = fritz.box
+DNS.2                   = www.fritz.box
+DNS.3                   = myfritz.box
+DNS.4                   = www.myfritz.box
+DNS.5                   = ${ENV::FRITZBOX_INTERN}
+DNS.6                   = fritz.nas
+DNS.7                   = www.fritz.nas
+IP.0                    = ${ENV::FRITZBOX_IP4}
