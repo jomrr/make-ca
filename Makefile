@@ -5,6 +5,7 @@
 # ******************************************************************************
 SHELL			:= bash
 OPENSSL			:= /usr/bin/openssl
+OPENSSL_CA_NEW	:= $(OPENSSL) ca -batch -notext -create_serial
 
 # ca default settings
 include			settings.mk
@@ -33,28 +34,43 @@ CONFIG_TARGETS	:= $(filter-out $(FILTER_CONFIGS),$(wildcard $(CNFDIR)/*.cnf))
 # functions
 # ******************************************************************************
 
+# create root ca
+define gen_root_ca
+	$(OPENSSL_CA_NEW) \
+		-config $(CNFDIR)/$(1)-ca.cnf \
+		-in $(2) -out $(3) \
+		-extensions $(1)_ca_ext \
+		-passin file:$(CA_DIR)/private/$(1)-ca.pwd \
+		-selfsign;
+endef
+
+# create intermediate
+define gen_intermediate_ca
+	$(OPENSSL_CA_NEW) \
+		-config $(CNFDIR)/root-ca.cnf \
+		-in $(2) -out $(3) \
+		-extensions $(1)_ca_ext \
+		-passin file:$(CA_DIR)/private/root-ca.pwd \
+		-keyfile $(CA_DIR)/private/root-ca.key;
+endef
+
+define gen_signing_ca
+	$(OPENSSL_CA_NEW) \
+		-config $(CNFDIR)/intermediate-ca.cnf \
+		-in $(2) -out $(3) \
+		-extensions signing_ca_ext \
+		-passin file:$(CA_DIR)/private/intermediate-ca.pwd \
+		-keyfile $(CA_DIR)/private/intermediate-ca.key;
+endef
+
 # function to create root, intermediate and signing ca(s)
 define gen_ca
-	if [ $(1) == root ]; then \
-		$(OPENSSL) ca -batch -notext -create_serial \
-			-config $(CNFDIR)/$(1)-ca.cnf \
-			-in $(2) -out $(3) \
-			-extensions $(1)_ca_ext \
-			-passin file:$(CA_DIR)/private/$(1)-ca.pwd \
-			-selfsign; \
-	elif [ $(1) == intermediate ]; then \
-		$(OPENSSL) ca -batch -notext -create_serial \
-			-config $(CNFDIR)/root-ca.cnf \
-			-in $(2) -out $(3) \
-			-extensions $(1)_ca_ext \
-			-passin file:$(CA_DIR)/private/root-ca.pwd \
-			-keyfile $(CA_DIR)/private/root-ca.key; \
+	if [ $(1) = root ]; then \
+		$(call gen_root_ca,$(1),$(2),$(3))	\
+	elif [ $(1) = intermediate ]; then \
+		$(call gen_intermediate_ca,$(1),$(2),$(3))	\
 	else \
-		$(OPENSSL) ca -batch -notext -create_serial \
-			-config $(CNFDIR)/intermediate-ca.cnf \
-			-in $(2) -out $(3) -extensions signing_ca_ext \
-			-passin file:$(CA_DIR)/private/intermediate-ca.pwd \
-			-keyfile $(CA_DIR)/private/intermediate-ca.key; \
+		$(call gen_signing_ca,$(1),$(2),$(3))	\
 	fi
 endef
 
