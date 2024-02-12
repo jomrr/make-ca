@@ -1,6 +1,6 @@
 # TLS server certificate request
 [ default ]
-SAN                     = DNS:www.${ENV::CN}
+SAN                     = DNS:*.${ENV::CN}
 
 [ req ]
 default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
