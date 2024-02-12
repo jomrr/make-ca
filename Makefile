@@ -44,7 +44,7 @@ define gen_root_ca
 		-selfsign;
 endef
 
-# create intermediate
+# create intermediate ca
 define gen_intermediate_ca
 	$(OPENSSL_CA_NEW) \
 		-config $(CNFDIR)/root-ca.cnf \
@@ -54,6 +54,7 @@ define gen_intermediate_ca
 		-keyfile $(CA_DIR)/private/root-ca.key;
 endef
 
+# create signing ca
 define gen_signing_ca
 	$(OPENSSL_CA_NEW) \
 		-config $(CNFDIR)/intermediate-ca.cnf \
