@@ -187,9 +187,9 @@ $(CRTDIR)/%.p12: $(CRTDIR)/%.crt
     	-certfile $(WEBDIR)/$(CA)-ca-chain.pem \
 		-out $@
 
-# --- create pem bundle with key, crt and ca-chain -----------------------------
+# --- create pem bundle with crt and ca-chain -----------------------------
 $(CRTDIR)/%.pem: $(CRTDIR)/%.crt
-	@cat $(CRTDIR)/$*.key $(CRTDIR)/$*.crt $(WEBDIR)/$(CA)-ca-chain.pem > $@
+	@cat $(CRTDIR)/$*.crt $(WEBDIR)/$(CA)-ca-chain.pem > $@
 
 # --- create tls client certificate --------------------------------------------
 .PHONY: client
