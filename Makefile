@@ -63,12 +63,14 @@ define gen_ca_chain
 	if [ $(1) == root ]; then \
 		echo "Nothing to chain for root-ca ;)"; \
 	elif [ $(1) == intermediate ]; then \
-		cat $(WEBDIR)/$(1)-ca.pem $(WEBDIR)/root-ca.pem \
-			> $(WEBDIR)/$(1)-ca-chain.pem; \
+		cat $(WEBDIR)/$(1)-ca.pem \
+			$(WEBDIR)/root-ca.pem \
+		>	$(WEBDIR)/$(1)-ca-chain.pem; \
 	else \
 		cat $(WEBDIR)/$(1)-ca.pem \
-		$(WEBDIR)/intermediate-ca.pem $(WEBDIR)/root-ca.pem \
-			> $(WEBDIR)/$(1)-ca-chain.pem; \
+			$(WEBDIR)/intermediate-ca.pem \
+			$(WEBDIR)/root-ca.pem \
+		>	$(WEBDIR)/$(1)-ca-chain.pem; \
 	fi
 endef
 
@@ -79,7 +81,7 @@ endef
 # keep these files
 .PRECIOUS: \
 	$(CA_DIR)/certs/%-ca.crt \
-	$(CA_DIR)/db/%.db \
+	$(CA_DIR)/db/%.txt \
 	$(CA_DIR)/private/%-ca.key \
 	$(CA_DIR)/private/%.pwd \
 	$(CA_DIR)/reqs/%-ca.csr \
@@ -173,8 +175,8 @@ smartcard:
 # --- print CA db files with CA name for grepping serials, revoked, etc. -------
 .PHONY: print
 print:
-	@find $(CA_DIR)/db/ -type f -name "*.db" -exec grep -H ^ {} + | \
-		sed 's/.*\/\(.*\)\.db:\(.*\)\/C=.*CN=\(.*\)/\2CN="\3" \1/' | \
+	@find $(CA_DIR)/db/ -type f -name "*.txt" -exec grep -H ^ {} + | \
+		sed 's/.*\/\(.*\)\.txt:\(.*\)\/C=.*CN=\(.*\)/\2CN="\3" \1/' | \
 		tr '\t' ' ' | sort
 
 # --- invisible target to revoke a certificate by CN= --------------------------
@@ -220,17 +222,17 @@ init: $(SIGNING_CA)
 
 # init root ca
 .PHONY: root
-root: %: $(CA_DIR)/db/%-ca.db $(WEBDIR)/%-ca.cer
+root: %: $(CA_DIR)/db/%-ca.txt $(WEBDIR)/%-ca.cer
 
 # init intermediate ca, depends on root ca, so root will run if necessary
 .PHONY: intermediate $(WEBDIR)/root-ca.crl
 intermediate: %: root \
-	$(CA_DIR)/db/%-ca.db $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c
+	$(CA_DIR)/db/%-ca.txt $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c
 
 # init signing CAs, depends on intermediate and implicitly on root
 .PHONY: $(SIGNING_CA)
 $(SIGNING_CA): %: intermediate \
-	$(CA_DIR)/db/%-ca.db $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c \
+	$(CA_DIR)/db/%-ca.txt $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c \
 	$(WEBDIR)/intermediate-ca.crl
 
 # issue ca certificate
@@ -238,11 +240,11 @@ $(CA_DIR)/certs/%-ca.crt: $(CA_DIR)/reqs/%-ca.csr
 	@$(call gen_ca,$*,$<,$@)
 
 # create ca filesystem structure
-$(CA_DIR)/db/%.db:
+$(CA_DIR)/db/%.txt:
 	@mkdir -m 755 -p $(CA_DIR)/{certs,reqs} dist www
 	@mkdir -m 750 -p $(CA_DIR)/{db,new,private}
-	@install -m 640 /dev/null $(CA_DIR)/db/$*.db
-	@install -m 640 /dev/null $(CA_DIR)/db/$*.db.attr
+	@install -m 640 /dev/null $(CA_DIR)/db/$*.txt
+	@install -m 640 /dev/null $(CA_DIR)/db/$*.txt.attr
 	@install -m 640 /dev/null $(CA_DIR)/db/$*.crl.srl
 	@echo 01 > $(CA_DIR)/db/$*.crl.srl
 
