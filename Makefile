@@ -157,7 +157,7 @@ client: $(CA := component KEY_ALG=RSA:4096) $(CRTDIR)/$(CN).p12
 
 # --- create tls certificate for fritzbox --------------------------------------
 .PHONY: fritzbox
-fritzbox: $(CA := component) $(CRTDIR)/fritz.box.pem
+fritzbox: $(CA := component) $(CRTDIR)/fritzbox.pem
 
 # --- generate CRLs for all CAs ------------------------------------------------
 .PHONY: gencrls
@@ -224,21 +224,25 @@ destroy:
 # init all CAs and generate initial CRLs
 .PHONY: init
 init: $(SIGNING_CA)
+	@$(MAKE) gencrls
 
 # init root ca
 .PHONY: root
 root: %: $(CA_DIR)/db/%-ca.txt $(WEBDIR)/%-ca.cer
 
 # init intermediate ca, depends on root ca, so root will run if necessary
-.PHONY: intermediate $(WEBDIR)/root-ca.crl
+.PHONY: intermediate
 intermediate: %: root \
-	$(CA_DIR)/db/%-ca.txt $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c
+	$(CA_DIR)/db/%-ca.txt \
+	$(WEBDIR)/%-ca.cer \
+	$(WEBDIR)/%-ca-chain.p7c
 
 # init signing CAs, depends on intermediate and implicitly on root
 .PHONY: $(SIGNING_CA)
 $(SIGNING_CA): %: intermediate \
-	$(CA_DIR)/db/%-ca.txt $(WEBDIR)/%-ca.cer $(WEBDIR)/%-ca-chain.p7c \
-	$(WEBDIR)/intermediate-ca.crl
+	$(CA_DIR)/db/%-ca.txt \
+	$(WEBDIR)/%-ca.cer \
+	$(WEBDIR)/%-ca-chain.p7c
 
 # issue ca certificate
 $(CA_DIR)/certs/%-ca.crt: $(CA_DIR)/reqs/%-ca.csr
@@ -279,7 +283,6 @@ $(WEBDIR)/%-ca.cer: $(WEBDIR)/%-ca.pem
 		-outform DER
 
 # create crl for ca and force it to run
-.PHONY: $(WEBDIR)/%-ca.crl
 $(WEBDIR)/%-ca.crl:
 	@$(OPENSSL) ca -gencrl \
 		-config $(CNFDIR)/$*-ca.cnf \
