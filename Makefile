@@ -5,7 +5,7 @@
 # ******************************************************************************
 SHELL			:= bash
 OPENSSL			:= /usr/bin/openssl
-OPENSSL_GEN_CA	:= $(OPENSSL) ca -batch -notext -create_serial
+OPENSSL_GEN_CA		:= $(OPENSSL) ca -batch -notext -create_serial
 
 # ca default settings
 include			settings.mk
@@ -60,11 +60,11 @@ endef
 # function to create root, intermediate and signing ca(s)
 define gen_ca
 	if [ $(1) = root ]; then \
-		$(call gen_root_ca,$(1),$(2),$(3))	\
+		$(call gen_root_ca,$(1),$(2),$(3)) \
 	elif [ $(1) = intermediate ]; then \
-		$(call gen_intermediate_ca,$(1),$(2),$(3))	\
+		$(call gen_intermediate_ca,$(1),$(2),$(3)) \
 	else \
-		$(call gen_signing_ca,$(1),$(2),$(3))	\
+		$(call gen_signing_ca,$(1),$(2),$(3)) \
 	fi
 endef
 
