@@ -30,9 +30,9 @@ export DEFAULT_BITS		?= 4096
 # default settings for hash in cnf files
 export DEFAULT_MD		?= sha512
 # CA Keys: param for openssl genpkey -algorithm $(CAK_ALG)
-CAK_ALG					?= ED448
-#CAK_ALG					?= RSA -pkeyopt rsa_keygen_bits:8192
+#CAK_ALG					?= ED448
+CAK_ALG					?= RSA -pkeyopt rsa_keygen_bits:8192
 # CRT Keys: param for openssl req -newkey $(KEY_ALG)
 # NOTE: ED25519 p12 client certificates still fail to import in Browsers
-KEY_ALG					?= ED448
-#KEY_ALG					?= RSA:$(DEFAULT_BITS)
+#KEY_ALG					?= ED448
+KEY_ALG					?= RSA:$(DEFAULT_BITS)
