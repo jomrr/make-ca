@@ -36,7 +36,7 @@ export OCSP_URL			:= http://ocsp.example.com
 export DEFAULT_BITS		?= 4096
 
 # default settings for hash in cnf files
-export DEFAULT_MD		?= sha512
+export DEFAULT_MD		?= sha3-256
 
 # CA Keys: param for openssl genpkey -algorithm $(CAK_ALG)
 #CAK_ALG					?= ED448
