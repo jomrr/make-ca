@@ -5,7 +5,7 @@
 # ******************************************************************************
 SHELL			:= bash
 OPENSSL			:= /usr/bin/openssl
-OPENSSL_CA_NEW	:= $(OPENSSL) ca -batch -notext -create_serial
+OPENSSL_GEN_CA	:= $(OPENSSL) ca -batch -notext -create_serial
 
 # ca default settings
 include			settings.mk
@@ -29,7 +29,7 @@ ALL_CA			:= root intermediate $(SIGNING_CA)
 
 # create root ca
 define gen_root_ca
-	$(OPENSSL_CA_NEW) \
+	$(OPENSSL_GEN_CA) \
 		-config $(CNFDIR)/$(1)-ca.cnf \
 		-in $(2) -out $(3) \
 		-extensions $(1)_ca_ext \
@@ -39,7 +39,7 @@ endef
 
 # create intermediate ca
 define gen_intermediate_ca
-	$(OPENSSL_CA_NEW) \
+	$(OPENSSL_GEN_CA) \
 		-config $(CNFDIR)/root-ca.cnf \
 		-in $(2) -out $(3) \
 		-extensions $(1)_ca_ext \
@@ -49,7 +49,7 @@ endef
 
 # create signing ca
 define gen_signing_ca
-	$(OPENSSL_CA_NEW) \
+	$(OPENSSL_GEN_CA) \
 		-config $(CNFDIR)/intermediate-ca.cnf \
 		-in $(2) -out $(3) \
 		-extensions signing_ca_ext \
