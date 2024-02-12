@@ -98,11 +98,11 @@ endef
 
 # archive files by CN
 define archive
-	$(eval ARCPATH := $(ARCDIR)/$(1)-$(shell date +%Y-%m-%dT%H:%M:%S%z).tar.gz) \
-	tar -czvf $(ARCPATH) \
+	$(eval APATH := $(ARCDIR)/$(1)-$(shell date +%Y-%m-%dT%H:%M:%S%z).tar.gz) \
+	tar -czvf $(APATH) \
 		$(shell find $(CRTDIR) -type f -regextype posix-extended \
 		-regex ".*/$(1)\.[^\.]+$$") 2>&1 1>/dev/null && \
-	echo "$(ARCPATH) created for CN=$(1)."
+	echo "$(APATH) created for CN=$(1)."
 endef
 
 # delete files by CN
