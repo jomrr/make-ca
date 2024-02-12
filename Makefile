@@ -23,13 +23,6 @@ WEBDIR			:= www
 SIGNING_CA		:= component identity
 ALL_CA			:= root intermediate $(SIGNING_CA)
 
-ALL_CA_CONFIGS	:= $(wildcard $(CNFDIR)/*-ca.cnf)
-PREDEF_CONFIGS	:= $(CNFDIR)/client.cnf $(CNFDIR)/email.cnf
-PREDEF_CONFIGS	+= $(CNFDIR)/fritzbox.cnf $(CNFDIR)/identity.cnf
-PREDEF_CONFIGS	+= $(CNFDIR)/server.cnf $(CNFDIR)/smartcard.cnf
-FILTER_CONFIGS	:= $(ALL_CA_CONFIGS) #$(PREDEF_CONFIGS)
-CONFIG_TARGETS	:= $(filter-out $(FILTER_CONFIGS),$(wildcard $(CNFDIR)/*.cnf))
-
 # ******************************************************************************
 # functions
 # ******************************************************************************
@@ -128,11 +121,6 @@ help:
 # ==============================================================================
 # targets for operating the CAs
 # ==============================================================================
-
-# --- create CRT from existing static configuration file without prompting -----
-.PHONY: $(CONFIG_TARGETS)
-$(CONFIG_TARGETS):
-# TODO
 
 # --- create CSR and KEY, config is selected by calling target -----------------
 $(CRTDIR)/%.csr:
