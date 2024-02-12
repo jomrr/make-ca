@@ -5,7 +5,7 @@
 # ******************************************************************************
 SHELL			:= bash
 OPENSSL			:= /usr/bin/openssl
-OPENSSL_GEN_CA		:= $(OPENSSL) ca -batch -notext -create_serial
+OPENSSL_GEN_CA	:= $(OPENSSL) ca -batch -notext -create_serial
 
 # ca default settings
 include			settings.mk
