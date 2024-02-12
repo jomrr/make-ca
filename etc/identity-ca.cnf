@@ -96,4 +96,4 @@ URI.0                   = $crl_url
 caIssuers;URI.0         = $aia_url
 
 [ ocsp_info ]
-OCSP;URI.0              = $ocsp_url
+OCSP;URI.0              = $ocsp_url/identity
