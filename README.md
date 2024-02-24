@@ -85,6 +85,20 @@ Here are a few examples how to use `make-ca`.
 
 ```bash
 make client CN=server01.example.com SAN=="DNS:server01.example.com,DNS:www.example.com,IP:10.12.10.11"
+```
+
+### Revoke TLS Server certificate
+
+Use the CA specific target to revoke, in this case `make rev-component`.
+
+```bash
+make rev-component CN=server01.example.com REASON=superseded
+```
+
+### Create Ed25519 TLS Server certificate
+
+```bash
+KEY_ALG=ED25519 make server CN=test.example.com
 
 # example output:
 Signature ok
@@ -100,7 +114,7 @@ Certificate Details:
             localityName              = Strunzenoed
             organizationName          = Example
             organizationalUnitName    = Example PKI
-            commonName                = server01.example.com
+            commonName                = test.example.com
         X509v3 extensions:
             X509v3 Key Usage: critical
                 Digital Signature, Key Encipherment
@@ -117,25 +131,11 @@ Certificate Details:
                 Full Name:
                   URI:http://pki.example.com/component-ca.crl
             X509v3 Subject Alternative Name: 
-                DNS:server01.example.com, DNS:www.example.com, IP:10.12.10.11
+                DNS:test.example.com
 Certificate is to be certified until Feb 23 21:25:10 2026 GMT (730 days)
 
 Write out database with 1 new entries
 Data Base Updated
-```
-
-### Revoke TLS Server certificate
-
-Use the CA specific target to revoke, in this case `make rev-component`.
-
-```bash
-make rev-component CN=server01.example.com REASON=superseded
-```
-
-### Create Ed25519 TLS Server certificate
-
-```bash
-KEY_ALG=ED25519 make server CN=test.example.com
 ```
 
 ### Create S/MIME certificate
