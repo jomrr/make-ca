@@ -74,13 +74,14 @@ keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
+authorityInfoAccess     = @ocsp_info
+crlDistributionPoints   = @crl_info
 
 [ intermediate_ca_ext ]
 keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
-authorityInfoAccess     = @issuer_info
 authorityInfoAccess     = @ocsp_info
 crlDistributionPoints   = @crl_info
 
@@ -88,11 +89,12 @@ crlDistributionPoints   = @crl_info
 authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
 
-[ issuer_info ]
-caIssuers;URI.0         = $aia_url
-
 [ crl_info ]
 URI.0                   = $crl_url
 
+[ issuer_info ]
+caIssuers;URI.0         = $aia_url
+
 [ ocsp_info ]
+caIssuers;URI.0         = $aia_url
 OCSP;URI.0              = $ocsp_url/root

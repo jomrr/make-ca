@@ -28,15 +28,18 @@ ALL_CA			:= root intermediate $(SIGNING_CA)
 # list of component CNs for revoke
 COMPONENT_DB	:= $(CA_DIR)/db/component-ca.txt
 COMPONENT_REV	:= $(shell grep -oP '^V.*?/CN=\K[^/]+' \
-	$(COMPONENT_DB) 2>/dev/null | awk '{printf "revoke-%s ", $$0}')
+	$(COMPONENT_DB) 2>/dev/null | awk '{echo "revoke-%s ", $$0}')
 
 # list of Identity CNs for revoke
 IDENTITY_DB		:= $(CA_DIR)/db/identity-ca.txt
 IDENTITY_REV	:= $(shell grep -oP '^V.*?/CN=\K[^/]+' \
-	$(IDENTITY_DB) 2>/dev/null | awk '{printf "revoke-%s ", $$0}')
+	$(IDENTITY_DB) 2>/dev/null | awk '{echo "revoke-%s ", $$0}')
+
+# certificate settings
+FILENAME		:= $(if $(EMAIL),$(EMAIL),$(CN))
 
 # ******************************************************************************
-# functions
+# ca functions
 # ******************************************************************************
 
 # create root ca
@@ -156,7 +159,41 @@ bla:
 
 .PHONY: help
 help:
-	@echo "Help!"
+	@echo "Usage: make [target] [CN=common name] [EMAIL=email address] [REASON=reason] \
+	[SAN=subject alternative names] [KEY_ALG=algorithm]"
+	@echo ""
+	@echo "Default values for CN, EMAIL, REASON, SAN and KEY_ALG are set in settings.mk"
+	@echo "Targets:"
+	@echo "  client        create tls client certificate"
+	@echo "  fritzbox      create tls certificate for fritzbox"
+	@echo "  server        create tls server certificate"
+	@echo "  smime         create certificate with smime extensions"
+	@echo "  gencrls       generate CRLs for all CAs"
+	@echo "  print         print CA db files with CA name for grepping serials, revoked, etc."
+	@echo "  clean         delete CSRs"
+	@echo "  distclean     delete KEYs and CERTs"
+	@echo "  destroy       delete everything but make and the config dir"
+	@echo "  init          init all CAs and generate initial CRLs"
+	@echo "  root          init root ca"
+	@echo "  intermediate  init intermediate ca"
+	@echo "  component     init component ca"
+	@echo "  identity      init identity ca"
+	@echo "  force-destroy delete everything without asking"
+	@echo "  test          test the makefile"
+	@echo "Variables:"
+	@echo "  CN            common name for the certificate"
+	@echo "  EMAIL         email address for the certificate"
+	@echo "  REASON        reason for revocation"
+	@echo "  KEY_ALG       algorithm for the private key"
+	@echo "  SAN           subject alternative names for the certificate"
+	@echo "Examples:"
+	@echo "  make client CN=client.example.com"
+	@echo "  make server CN=server.example.com SAN=DNS:server.example.com,DNS:www.example.com"
+	@echo "  make fritzbox CN=server.example.com"
+	@echo '  make smime CN="John Doe" EMAIL="john.doe@example.com"'
+	@echo "  make revoke-client.example.com REASON=superseded"
+	@echo "  make gencrls"
+	@echo "  make print"
 
 # ==============================================================================
 # targets for operating the CAs
@@ -193,29 +230,28 @@ $(CRTDIR)/%.pem: $(CRTDIR)/%.crt
 
 # --- create tls client certificate --------------------------------------------
 .PHONY: client
-client: $(eval CA := component KEY_ALG=RSA:4096) $(CRTDIR)/$(CN).p12
+client: CA=component KEY_ALG=RSA:4096
+client: $(CRTDIR)/$(FILENAME).p12
 
 # --- create tls certificate for fritzbox --------------------------------------
 .PHONY: fritzbox
-fritzbox: $(eval CA := component) $(CRTDIR)/$(FRITZBOX_PUBLIC).myfritz.net.pem
+fritzbox: CA=component
+fritzbox: $(CRTDIR)/$(FRITZBOX_PUBLIC).myfritz.net.pem
 
 # --- generate CRLs for all CAs ------------------------------------------------
 .PHONY: gencrls
 gencrls: $(foreach ca,$(ALL_CA),$(WEBDIR)/$(ca)-ca.crl)
 
-# --- factory-reset, configure nitrokey and upload s/mime certificate ----------
-.PHONY: nitrokey
-nitrokey:
-# TODO
-
 # --- create tls server certificate --------------------------------------------
 .PHONY: server
-server: $(eval CA := component) $(CRTDIR)/$(CN).pem
+server: CA=component
+server: $(CRTDIR)/$(FILENAME).pem
 
-# --- create s/mime certificate for smartcard ----------------------------------
-.PHONY: smartcard
-smartcard:
-# TODO
+# --- create certificate with smime extensions ---------------------------------
+smime: CA=identity
+.PHONY: smime
+smime: CA=identity
+smime: $(CRTDIR)/$(FILENAME).p12
 
 # --- print CA db files with CA name for grepping serials, revoked, etc. -------
 .PHONY: print
@@ -229,9 +265,9 @@ print:
 $(COMPONENT_REV):
 	@$(eval CA := component)
 	@$(eval CN := $(subst revoke-,,$@))
-	@$(call archive,$(CN))
-	@$(call revoke,$(CN),$(CA),$(if $(REASON),$(REASON),superseded))
-	@$(call delete,$(CN))
+	@$(call archive,$(FILENAME))
+	@$(call revoke,$(FILENAME),$(CA),$(if $(REASON),$(REASON),superseded))
+	@$(call delete,$(FILENAME))
 	@$(MAKE) $(WEBDIR)/$(CA)-ca.crl
 
 # --- revoke CRT by Identity CA and rebuild its CRL ----------------------------
@@ -239,9 +275,9 @@ $(COMPONENT_REV):
 $(IDENTITY_REV):
 	@$(eval CA := identity)
 	@$(eval CN := $(subst revoke-,,$@))
-	@$(call archive,$(CN))
-	@$(call revoke,$(CN),$(CA),$(if $(REASON),$(REASON),superseded))
-	@$(call delete,$(CN))
+	@$(call archive,$(FILENAME))
+	@$(call revoke,$(FILENAME),$(CA),$(if $(REASON),$(REASON),superseded))
+	@$(call delete,$(FILENAME))
 	@$(MAKE) $(WEBDIR)/$(CA)-ca.crl
 
 # ==============================================================================
@@ -251,12 +287,12 @@ $(IDENTITY_REV):
 # delete CSRs
 .PHONY: clean
 clean:
-	@rm dist/$(CN).csr
+	@rm dist/$(FILENAME).csr
 
 # delete KEYs and CERTs
 .PHONY: distclean
 distclean: clean
-	@rm dist/$(CN).{crt,key,pem,p12}
+	@rm dist/$(FILENAME).{crt,key,pem,p12}
 
 # delete everything but make and the config dir
 .PHONY: destroy
@@ -368,11 +404,12 @@ test:
 	$(MAKE) force-destroy
 	CAK_ALG=ED25519 $(MAKE) init
 	KEY_ALG=ED25519 $(MAKE) server CN=test.example.com
-	$(MAKE) fritzbox
-	$(MAKE) revoke-test.example.com
+	KEY_ALG=ED25519 $(MAKE) fritzbox
+	KEY_ALG=ED25519 $(MAKE) revoke-test.example.com
+	KEY_ALG=ED25519 CN="test user" EMAIL="test@example.com" $(MAKE) smime
 	$(MAKE) force-destroy
 
 # catch all unkown targets and inform
-%:
-	@printf "INFO: omitting unknown target:\t%s\n" $@ 1>&2
-	@:
+# %:
+# 	@echo "INFO: omitting unknown target:\t%s\n" $@ 1>&2
+# 	@:
