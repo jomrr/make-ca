@@ -85,6 +85,43 @@ Here are a few examples how to use `make-ca`.
 
 ```bash
 make client CN=server01.example.com SAN=="DNS:server01.example.com,DNS:www.example.com,IP:10.12.10.11"
+
+# example output:
+Signature ok
+Certificate Details:
+        Serial Number:
+            61:3b:bc:01:8b:c1:34:99:db:1b:b2:e3:8a:0c:77:fa:64:6e:bd:0c
+        Validity
+            Not Before: Feb 24 21:25:10 2024 GMT
+            Not After : Feb 23 21:25:10 2026 GMT
+        Subject:
+            countryName               = DE
+            stateOrProvinceName       = Bayern
+            localityName              = Strunzenoed
+            organizationName          = Example
+            organizationalUnitName    = Example PKI
+            commonName                = server01.example.com
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Digital Signature, Key Encipherment
+            X509v3 Extended Key Usage: 
+                TLS Web Client Authentication, TLS Web Server Authentication
+            X509v3 Subject Key Identifier: 
+                42:BE:22:33:44:CF:72:02:58:EB:EF:88:4B:BA:1C:10:B6:AA:DB:C8
+            X509v3 Authority Key Identifier: 
+                FE:80:D7:E5:6D:27:9E:85:18:13:99:E5:79:B4:9E:CB:FA:42:21:F4
+            Authority Information Access: 
+                CA Issuers - URI:http://pki.example.com/component-ca.cer
+                OCSP - URI:http://ocsp.example.com/component
+            X509v3 CRL Distribution Points: 
+                Full Name:
+                  URI:http://pki.example.com/component-ca.crl
+            X509v3 Subject Alternative Name: 
+                DNS:server01.example.com, DNS:www.example.com, IP:10.12.10.11
+Certificate is to be certified until Feb 23 21:25:10 2026 GMT (730 days)
+
+Write out database with 1 new entries
+Data Base Updated
 ```
 
 ### Revoke TLS Server certificate
