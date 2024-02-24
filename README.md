@@ -89,10 +89,30 @@ make client CN=server01.example.com SAN=="DNS:tatooine.example.com,DNS:www.examp
 
 ### Revoke TLS Server certificate
 
-Use \<tab\> for autocompletion after `make revoke-`.
+Use the CA specific target to revoke, in this case `make rev-component`.
 
 ```bash
-make revoke-server01<tab>.example.com REASON=superseded
+make rev-component CN=server01.example.com REASON=superseded
+```
+
+### Create Ed25519 TLS Server certificate
+
+```bash
+KEY_ALG=ED25519 make server CN=test.example.com
+```
+
+### Create S/MIME certificate
+
+```bash
+make smime CN="John Doe" EMAIL="john.doe@example.com"
+```
+
+### Revoke S/MIME certificate
+
+Use the CA specific target to revoke, in this case `make rev-identity`.
+
+```bash
+make rev-identity EMAIL="john.doe@example.com"
 ```
 
 ## License

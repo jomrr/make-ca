@@ -25,16 +25,6 @@ WEBDIR			:= www
 SIGNING_CA		:= component identity
 ALL_CA			:= root intermediate $(SIGNING_CA)
 
-# list of component CNs for revoke
-COMPONENT_DB	:= $(CA_DIR)/db/component-ca.txt
-COMPONENT_REV	:= $(shell grep -oP '^V.*?/CN=\K[^/]+' \
-	$(COMPONENT_DB) 2>/dev/null | awk '{echo "revoke-%s ", $$0}')
-
-# list of Identity CNs for revoke
-IDENTITY_DB		:= $(CA_DIR)/db/identity-ca.txt
-IDENTITY_REV	:= $(shell grep -oP '^V.*?/CN=\K[^/]+' \
-	$(IDENTITY_DB) 2>/dev/null | awk '{echo "revoke-%s ", $$0}')
-
 # certificate settings
 FILENAME		:= $(if $(EMAIL),$(EMAIL),$(CN))
 
@@ -166,6 +156,8 @@ help:
 	@echo "  smime         create certificate with smime extensions"
 	@echo "  gencrls       generate CRLs for all CAs"
 	@echo "  print         print CA db files with CA name for grepping serials, revoked, etc."
+	@echo "  rev-component revoke certificate from Component CA by CN"
+	@echo "  rev-identity  revoke certificate from Identity CA by EMAIL"
 	@echo "  clean         delete CSRs"
 	@echo "  distclean     delete KEYs and CERTs"
 	@echo "  destroy       delete everything but make and the config dir"
@@ -226,7 +218,8 @@ $(CRTDIR)/%.pem: $(CRTDIR)/%.crt
 
 # --- create tls client certificate --------------------------------------------
 .PHONY: client
-client: CA=component KEY_ALG=RSA:4096
+client: CA=component
+client: KEY_ALG=RSA:4096
 client: $(CRTDIR)/$(FILENAME).p12
 
 # --- create tls certificate for fritzbox --------------------------------------
@@ -247,7 +240,7 @@ server: $(CRTDIR)/$(FILENAME).pem
 smime: CA=identity
 .PHONY: smime
 smime: CA=identity
-smime: $(CRTDIR)/$(FILENAME).p12
+smime: $(CRTDIR)/$(FILENAME).pem
 
 # --- print CA db files with CA name for grepping serials, revoked, etc. -------
 .PHONY: print
@@ -257,20 +250,18 @@ print:
 		tr '\t' ' ' | sort
 
 # --- revoke CRT by Component CA and rebuild its CRL ---------------------------
-.PHONY: $(COMPONENT_REV)
-$(COMPONENT_REV):
-	@$(eval CA := component)
-	@$(eval CN := $(subst revoke-,,$@))
+.PHONY: rev-component
+rev-component: CA=component
+rev-component:
 	@$(call archive,$(FILENAME))
 	@$(call revoke,$(FILENAME),$(CA),$(if $(REASON),$(REASON),superseded))
 	@$(call delete,$(FILENAME))
 	@$(MAKE) $(WEBDIR)/$(CA)-ca.crl
 
 # --- revoke CRT by Identity CA and rebuild its CRL ----------------------------
-.PHONY: $(IDENTITY_REV)
-$(IDENTITY_REV):
-	@$(eval CA := identity)
-	@$(eval CN := $(subst revoke-,,$@))
+.PHONY: rev-identity
+rev-identity: CA=identity
+rev-identity:
 	@$(call archive,$(FILENAME))
 	@$(call revoke,$(FILENAME),$(CA),$(if $(REASON),$(REASON),superseded))
 	@$(call delete,$(FILENAME))
@@ -399,10 +390,10 @@ force-destroy:
 test:
 	$(MAKE) force-destroy
 	CAK_ALG=ED25519 $(MAKE) init
-	KEY_ALG=ED25519 $(MAKE) server CN=test.example.com
+	KEY_ALG=ED25519 $(MAKE) server CN=test.example.com SAN=DNS:test.example.com,DNS:www.example.com
 	KEY_ALG=ED25519 $(MAKE) fritzbox
-	KEY_ALG=ED25519 $(MAKE) revoke-test.example.com
-	KEY_ALG=ED25519 CN="test user" EMAIL="test@example.com" $(MAKE) smime
+	KEY_ALG=ED25519 $(MAKE) rev-component CN=test.example.com
+	KEY_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="test@example.com"
 	$(MAKE) force-destroy
 
 # catch all unkown targets and inform
