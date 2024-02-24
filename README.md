@@ -1,8 +1,6 @@
 # make-ca
 
-![GitHub License](https://img.shields.io/github/license/jam82/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjam82%2Fmake-ca%2Fblob%2Fmain%2FLICENSE)
-
-![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/jam82/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjam82%2Fmake-ca%2Fissues)
+![GitHub License](https://img.shields.io/github/license/jam82/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjam82%2Fmake-ca%2Fblob%2Fmain%2FLICENSE) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/jam82/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjam82%2Fmake-ca%2Fissues)
 
 Makefile for creating and managing a 3-tier certificate authority.
 
