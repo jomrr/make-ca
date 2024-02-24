@@ -1,29 +1,14 @@
 # make-ca
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jam82/make-ca/blob/main/LICENSE)
+![GitHub License](https://img.shields.io/github/license/jam82/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjam82%2Fmake-ca%2Fblob%2Fmain%2FLICENSE)
+
+![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/jam82/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjam82%2Fmake-ca%2Fissues)
 
 Makefile for creating and managing a 3-tier certificate authority.
 
 > This is not meant for production use, but because I can.
 >
 > The passwords for the CA keys are stored on disk.
-
-## Table of Contents
-
-- [make-ca](#make-ca)
-  - [Table of Contents](#table-of-contents)
-  - [Getting started](#getting-started)
-    - [Directory Structure](#directory-structure)
-    - [Root CA](#root-ca)
-      - [Intermediate CA](#intermediate-ca)
-        - [Identity CA](#identity-ca)
-        - [Component CA](#component-ca)
-  - [Installation](#installation)
-  - [Usage Examples](#usage-examples)
-    - [Create TLS Server certificate with subjectAltNames](#create-tls-server-certificate-with-subjectaltnames)
-    - [Revoke TLS Server certificate](#revoke-tls-server-certificate)
-  - [License](#license)
-  - [Author(s)](#authors)
 
 ## Getting started
 
