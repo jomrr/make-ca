@@ -84,7 +84,7 @@ Here are a few examples how to use `make-ca`.
 ### Create TLS Server certificate with subjectAltNames
 
 ```bash
-make client CN=server01.example.com SAN=="DNS:tatooine.example.com,DNS:www.example.com,IP:10.12.10.11"
+make client CN=server01.example.com SAN=="DNS:server01.example.com,DNS:www.example.com,IP:10.12.10.11"
 ```
 
 ### Revoke TLS Server certificate
