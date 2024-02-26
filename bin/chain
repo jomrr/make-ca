@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+
+# shellcheck source=/dev/null
+source bin/log
+
+declare ca=""
+declare dir=""
+declare format=""
+
+# Print usage information
+print_usage() {
+    echo "Usage: $0 --ca slug --dir /path/to/out/dir --format PEM|PKCS7"
+}
+
+# Check if required parameters are set
+chk_params() {
+    if [[ -z "${ca}" ]]; then
+        log_err "parameter --ca is required"
+        print_usage
+        exit 1
+    fi
+
+    if [[ -z "${dir}" ]]; then
+        log_err "parameter --dir is required"
+        print_usage
+        exit 1
+    fi
+    if [[ -z "${format}" ]]; then
+        log_err "parameter --dir is required"
+        print_usage
+        exit 1
+    fi
+    if [[ "$format" != "pem" && "$format" != "p7c" ]]; then
+        log_err "parameter --format must be 'pem' or 'p7c'"
+        print_usage
+        exit 1
+    fi
+}
+
+# Get parameters
+get_params() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --ca)
+                ca=$2
+                shift
+                ;;
+            --dir)
+                dir=$2
+                shift
+                ;;
+            --format)
+                format=$2
+                shift
+                ;;
+            *)
+                log_err "Unknown parameter: $1"
+                print_usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
+}
+
+# Generate PEM CA chain
+gen_chain_pem() {
+    log_info "Creating PEM CA chain for ${ca}"
+
+    if [[ "${ca}" == intermediate ]]; then
+        cat ${dir}/${ca}-ca.pem \
+            ${dir}/root-ca.pem  \
+            > ${dir}/${ca}-ca-chain.pem
+    elif [[ "${ca}" != root && "${ca}" != intermediate ]]; then
+        cat ${dir}/${ca}-ca.pem \
+            ${dir}/intermediate-ca.pem \
+            ${dir}/root-ca.pem  \
+            > ${dir}/${ca}-ca-chain.pem
+    fi
+
+    log_info "Created PEM CA chain for ${ca}"
+}
+
+# Generate PKCS7 CA chain
+gen_chain_p7c() {
+    log_info "Creating PKCS7 CA chain for ${ca}"
+
+    openssl crl2pkcs7 \
+        -nocrl \
+        -certfile ${dir}/${ca}-ca-chain.pem \
+        -out ${dir}/${ca}-ca-chain.p7c \
+        -outform DER
+
+    log_info "Created PKCS7 CA chain for ${ca}"
+}
+
+# Main function
+main() {
+    get_params "$@"
+    chk_params
+
+    if [[ "$format" == "pem" ]]; then
+        gen_chain_pem
+    else
+        gen_chain_p7c
+    fi
+}
+
+main "$@"

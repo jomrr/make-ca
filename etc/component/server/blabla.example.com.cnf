@@ -1,0 +1,33 @@
+# TLS certificate request for blabla.example.com
+[ default ]
+CN                      = blabla.example.com
+
+[ req ]
+default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
+encrypt_key             = no                    # Protect private key
+default_md              = ${ENV::DEFAULT_MD}    # MD to use
+utf8                    = yes                   # Input is UTF-8
+string_mask             = utf8only              # Emit UTF-8 strings
+prompt                  = no                    # Prompt for DN
+distinguished_name      = fritzbox_dn           # DN template
+req_extensions          = fritzbox_reqext       # Desired extensions
+
+[ fritzbox_dn ]
+countryName             = Germany
+stateOrProvinceName     = Bavaria
+localityName            = Strunzenoed
+organizationName        = Example
+organizationalUnitName  = Example Ops
+commonName              = ${CN}
+
+[ fritzbox_reqext ]
+keyUsage                = critical,digitalSignature,keyEncipherment
+extendedKeyUsage        = clientAuth,serverAuth
+subjectKeyIdentifier    = hash
+subjectAltName          = @san
+
+[ san ]
+DNS.0                   = ${CN}
+DNS.1                   = k2so.example.com
+DNS.2                   = www2.example.com
+IP.0                    = 10.11.12.13

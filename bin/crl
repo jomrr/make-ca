@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+# shellcheck source=/dev/null
+source bin/log
+
+declare config=""
+declare passin=""
+declare out=""
+
+# Print usage information
+print_usage() {
+    echo "Usage: $0 --ca ca-slug --dir /path/to/CA/basedir"
+}
+
+# Check if required parameters are set
+chk_params() {
+    if [[ -z "${config}" ]]; then
+        log_err "parameter --config is required"
+        print_usage
+        exit 1
+    fi
+
+    if [[ -z "${passin}" ]]; then
+        log_err "parameter --passin is required"
+        print_usage
+        exit 1
+    fi
+
+    if [[ -z "${out}" ]]; then
+        log_err "parameter --out is required"
+        print_usage
+        exit 1
+    fi
+}
+
+# Get parameters
+get_params() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --config)
+                config=$2
+                shift
+                ;;
+            --passin)
+                passin=$2
+                shift
+                ;;
+            --out)
+                out=$2
+                shift
+                ;;
+            *)
+                log_err "Unknown parameter: $1"
+                print_usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
+}
+
+gen_crl() {
+	openssl ca -gencrl -config "${config}" -passin "${passin}" -out "${out}".pem
+	openssl crl -in "${out}".pem -out "${out}" -outform DER
+}
+
+# Main function
+main() {
+    get_params "$@"
+    chk_params
+    gen_crl
+}
+
+main "$@"

@@ -18,6 +18,8 @@ ARCDIR			:= $(CA_DIR)/archive
 CRTDIR			:= dist
 # directory for openssl configuration files
 CNFDIR			:= etc
+# static configuration directory
+STCDIR			:= $(CNFDIR)/static
 # webroot, where CRLs, chains, etc. are placed
 WEBDIR			:= www
 
@@ -26,7 +28,7 @@ SIGNING_CA		:= component identity
 ALL_CA			:= root intermediate $(SIGNING_CA)
 
 # certificate settings
-FILENAME		:= $(if $(EMAIL),$(EMAIL),$(CN))
+FILENAME		?= $(if $(EMAIL),$(EMAIL),$(CN))
 
 # ******************************************************************************
 # ca functions
@@ -73,22 +75,6 @@ define gen_ca
 	fi
 endef
 
-# generate pem certificate chain
-define gen_ca_chain
-	if [ $(1) = root ]; then \
-		echo "Nothing to chain for root-ca ;)"; \
-	elif [ $(1) = intermediate ]; then \
-		cat $(WEBDIR)/$(1)-ca.pem \
-			$(WEBDIR)/root-ca.pem \
-		>	$(WEBDIR)/$(1)-ca-chain.pem; \
-	else \
-		cat $(WEBDIR)/$(1)-ca.pem \
-			$(WEBDIR)/intermediate-ca.pem \
-			$(WEBDIR)/root-ca.pem \
-		>	$(WEBDIR)/$(1)-ca-chain.pem; \
-	fi
-endef
-
 # archive files by CN
 define archive
 	$(eval APATH := $(ARCDIR)/$(1)-$(shell date +%Y-%m-%dT%H:%M:%S%z).tar.gz) \
@@ -104,7 +90,7 @@ define delete
 		-regex ".*/$(1)\.[^\.]+" -exec rm -f {} +
 endef
 
-# revoke a certificate by CN, CA and reason
+# revoke a certificate by CN, CA and REASON
 define revoke
 	$(OPENSSL) ca -batch \
 		-config $(CNFDIR)/$(2)-ca.cnf \
@@ -120,8 +106,8 @@ endef
 # keep these files
 .PRECIOUS: \
 	$(CA_DIR)/certs/%-ca.crt \
-	$(CA_DIR)/db/%.txt \
-	$(CA_DIR)/db/%.txt.attr \
+	$(CA_DIR)/db/%-ca.txt \
+	$(CA_DIR)/db/%-ca.txt.attr \
 	$(CA_DIR)/private/%-ca.key \
 	$(CA_DIR)/private/%.pwd \
 	$(CA_DIR)/reqs/%-ca.csr \
@@ -145,43 +131,7 @@ endef
 
 .PHONY: help
 help:
-	@echo "Usage: make [target] [CN=common name] [EMAIL=email address] [REASON=reason] \
-	[SAN=subject alternative names] [KEY_ALG=algorithm]"
-	@echo ""
-	@echo "Default values for CN, EMAIL, REASON, SAN and KEY_ALG are set in settings.mk"
-	@echo "Targets:"
-	@echo "  client        create tls client certificate"
-	@echo "  fritzbox      create tls certificate for fritzbox"
-	@echo "  server        create tls server certificate"
-	@echo "  smime         create certificate with smime extensions"
-	@echo "  gencrls       generate CRLs for all CAs"
-	@echo "  print         print CA db files with CA name for grepping serials, revoked, etc."
-	@echo "  rev-component revoke certificate from Component CA by CN"
-	@echo "  rev-identity  revoke certificate from Identity CA by EMAIL"
-	@echo "  clean         delete CSRs"
-	@echo "  distclean     delete KEYs and CERTs"
-	@echo "  destroy       delete everything but make and the config dir"
-	@echo "  init          init all CAs and generate initial CRLs"
-	@echo "  root          init root ca"
-	@echo "  intermediate  init intermediate ca"
-	@echo "  component     init component ca"
-	@echo "  identity      init identity ca"
-	@echo "  force-destroy delete everything without asking"
-	@echo "  test          test the makefile"
-	@echo "Variables:"
-	@echo "  CN            common name for the certificate"
-	@echo "  EMAIL         email address for the certificate"
-	@echo "  REASON        reason for revocation"
-	@echo "  KEY_ALG       algorithm for the private key"
-	@echo "  SAN           subject alternative names for the certificate"
-	@echo "Examples:"
-	@echo "  make client CN=client.example.com"
-	@echo "  make server CN=server.example.com SAN=DNS:server.example.com,DNS:www.example.com"
-	@echo "  make fritzbox CN=server.example.com"
-	@echo '  make smime CN="John Doe" EMAIL="john.doe@example.com"'
-	@echo "  make revoke-client.example.com REASON=superseded"
-	@echo "  make gencrls"
-	@echo "  make print"
+	@bin/$@
 
 # ==============================================================================
 # targets for operating the CAs
@@ -189,14 +139,19 @@ help:
 
 # --- create CSR and KEY, config is selected by calling target -----------------
 $(CRTDIR)/%.csr:
-	@$(OPENSSL) req -new -newkey $(KEY_ALG) \
+	@$(OPENSSL) req \
+		-new \
+		-newkey $(KEY_ALG) \
 		-config $(CNFDIR)/$(MAKECMDGOALS).cnf \
 		-keyout $(CRTDIR)/$*.key -out $@ -outform PEM
 
 # --- issue CRT by CA ----------------------------------------------------------
 $(CRTDIR)/%.crt: $(CRTDIR)/%.csr
 	@echo CA=$(CA)
-	@$(OPENSSL) ca -batch -notext -create_serial \
+	@$(OPENSSL) ca \
+		-batch \
+		-notext \
+		-create_serial \
 		-config $(CNFDIR)/$(CA)-ca.cnf \
 		-in $< \
 		-out $@ \
@@ -205,7 +160,8 @@ $(CRTDIR)/%.crt: $(CRTDIR)/%.csr
 
 # --- create pkcs12 bundle with key, crt and ca-chain --------------------------
 $(CRTDIR)/%.p12: $(CRTDIR)/%.crt
-	@$(OPENSSL) pkcs12 -export \
+	@$(OPENSSL) pkcs12 \
+		-export \
 		-name "$*" \
 		-inkey $(CRTDIR)/$*.key \
 		-in $< \
@@ -231,17 +187,6 @@ fritzbox: $(CRTDIR)/$(FRITZBOX_PUBLIC).myfritz.net.pem
 .PHONY: gencrls
 gencrls: $(foreach ca,$(ALL_CA),$(WEBDIR)/$(ca)-ca.crl)
 
-# --- create tls server certificate --------------------------------------------
-.PHONY: server
-server: CA=component
-server: $(CRTDIR)/$(FILENAME).pem
-
-# --- create certificate with smime extensions ---------------------------------
-smime: CA=identity
-.PHONY: smime
-smime: CA=identity
-smime: $(CRTDIR)/$(FILENAME).pem
-
 # --- print CA db files with CA name for grepping serials, revoked, etc. -------
 .PHONY: print
 print:
@@ -266,6 +211,22 @@ rev-identity:
 	@$(call revoke,$(FILENAME),$(CA),$(if $(REASON),$(REASON),superseded))
 	@$(call delete,$(FILENAME))
 	@$(MAKE) $(WEBDIR)/$(CA)-ca.crl
+
+# --- create tls server certificate --------------------------------------------
+.PHONY: server
+server: CA=component
+server: $(CRTDIR)/$(FILENAME).pem
+
+# --- create certificate with smime extensions ---------------------------------
+smime: CA=identity
+.PHONY: smime
+smime: CA=identity
+smime: $(CRTDIR)/$(FILENAME).pem
+
+# --- create certificates for static configurations ----------------------------
+.PHONY: static
+static:
+	@echo $(SERVERS)
 
 # ==============================================================================
 # targets for initializing or destroying the CAs
@@ -314,20 +275,17 @@ $(CA_DIR)/certs/%-ca.crt: $(CA_DIR)/reqs/%-ca.csr
 	@$(call gen_ca,$*,$<,$@)
 
 # when ca db is newer than crl, we create it
-$(CA_DIR)/db/%.txt:
+$(CA_DIR)/db/%-ca.txt:
 
 # create ca filesystem structure
-$(CA_DIR)/db/%.txt.attr:
-	@mkdir -m 755 -p $(CA_DIR)/{certs,reqs} dist www
-	@mkdir -m 750 -p $(CA_DIR)/{archive,db,new,private}
-	@install -m 640 /dev/null $(CA_DIR)/db/$*.txt
-	@install -m 640 /dev/null $(CA_DIR)/db/$*.txt.attr
-	@install -m 640 /dev/null $(CA_DIR)/db/$*.crl.srl
-	@echo 01 > $(CA_DIR)/db/$*.crl.srl
+$(CA_DIR)/db/%-ca.txt.attr:
+	@bin/prepare --ca $* --dir $(CA_DIR)
 
 # create ca certificate signing request
 $(CA_DIR)/reqs/%-ca.csr: $(CA_DIR)/private/%-ca.key
-	@$(OPENSSL) req -batch -new \
+	@$(OPENSSL) req \
+		-batch  \
+		-new \
 		-config $(CNFDIR)/$*-ca.cnf \
 		-out $@ -outform PEM \
 		-key $< -passin file:$(patsubst %.key,%.pwd,$<)
@@ -350,16 +308,12 @@ $(WEBDIR)/%-ca.cer: $(WEBDIR)/%-ca.pem
 		-out $(WEBDIR)/$*-ca.cer \
 		-outform DER
 
-# create crl for ca and force it to run
+# create crl for ca and run when ca db is newer than crl
 $(WEBDIR)/%-ca.crl: $(CA_DIR)/db/%-ca.txt
-	@$(OPENSSL) ca -gencrl \
-		-config $(CNFDIR)/$*-ca.cnf \
-		-passin file:$(CA_DIR)/private/$*-ca.pwd \
-		-out $@.pem
-	@$(OPENSSL) crl \
-		-in $@.pem \
-		-out $@ \
-		-outform DER
+	@bin/crl \
+		--config $(CNFDIR)/$*-ca.cnf \
+		--passin file:$(CA_DIR)/private/$*-ca.pwd \
+		--out $@
 
 # export ca certificate in PEM format. it already should be.
 $(WEBDIR)/%-ca.pem: $(CA_DIR)/certs/%-ca.crt
@@ -370,14 +324,11 @@ $(WEBDIR)/%-ca.pem: $(CA_DIR)/certs/%-ca.crt
 
 # create PKCS7 certificate chain for ca
 $(WEBDIR)/%-ca-chain.p7c: $(WEBDIR)/%-ca-chain.pem
-	@$(OPENSSL) crl2pkcs7 -nocrl \
-		-certfile $(WEBDIR)/$*-ca-chain.pem \
-		-out $(WEBDIR)/$*-ca-chain.p7c \
-		-outform DER
+	@bin/chain --ca $* --dir $(WEBDIR) --format p7c
 
 # create PEM certificate chain for ca
 $(WEBDIR)/%-ca-chain.pem: $(WEBDIR)/%-ca.pem
-	@$(call gen_ca_chain,$*)
+	@bin/chain --ca $* --dir $(WEBDIR) --format pem
 
 # ==============================================================================
 # general purpose targets
@@ -394,7 +345,6 @@ test:
 	KEY_ALG=ED25519 $(MAKE) fritzbox
 	KEY_ALG=ED25519 $(MAKE) rev-component CN=test.example.com
 	KEY_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="test@example.com"
-	$(MAKE) force-destroy
 
 # catch all unkown targets and inform
 # %:

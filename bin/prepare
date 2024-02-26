@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+# shellcheck source=/dev/null
+source bin/log
+
+declare ca=""
+declare dir=""
+
+# Print usage information
+print_usage() {
+    echo "Usage: $0 --ca ca-slug --dir /path/to/CA/basedir"
+}
+
+# Check if required parameters are set
+chk_params() {
+    if [[ -z "${ca}" ]]; then
+        log_err "parameter --ca is required"
+        print_usage
+        exit 1
+    fi
+
+    if [[ -z "${dir}" ]]; then
+        log_err "parameter --dir is required"
+        print_usage
+        exit 1
+    fi
+}
+
+# Get parameters
+get_params() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --ca)
+                ca=$2
+                shift
+                ;;
+            --dir)
+                dir=$2
+                shift
+                ;;
+            *)
+                log_err "Unknown parameter: $1"
+                print_usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
+}
+
+prepare_ca() {
+    log_info "Creating directory structure for ${ca}"
+    
+    mkdir -m 755 -p ${dir}/{certs,reqs} dist www
+	mkdir -m 750 -p ${dir}/{archive,db,new,private}
+	
+    install -m 640 /dev/null ${dir}/db/${ca}-ca.txt
+	install -m 640 /dev/null ${dir}/db/${ca}-ca.txt.attr
+	install -m 640 /dev/null ${dir}/db/${ca}-ca.crl.srl
+	
+    echo 01 > ${dir}/db/${ca}-ca.crl.srl
+
+    log_info "Finished creating directory structure ${ca}"
+}
+
+# Main function
+main() {
+    get_params "$@"
+    chk_params
+    prepare_ca
+}
+
+main "$@"
