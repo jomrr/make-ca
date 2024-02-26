@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
 
-# ##############################################################################
-# SCRIPT:       csr
-# AUTHOR:       jam82
-# DATE:         25.03.2022
-# LICENSE:      MIT
-# DESCRIPTION:  wrapper for printing the help message
-# ##############################################################################
-
 # shllcheck source=/dev/null
 source bin/log
 
