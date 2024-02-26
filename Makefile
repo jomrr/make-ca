@@ -5,7 +5,6 @@
 # ******************************************************************************
 SHELL			:= bash
 OPENSSL			:= /usr/bin/openssl
-OPENSSL_GEN_CA	:= $(OPENSSL) ca -batch -notext -create_serial
 
 # ca default settings
 include			settings.mk
@@ -23,7 +22,7 @@ FILENAME		?= $(if $(EMAIL),$(EMAIL),$(CN))
 
 # create root ca
 define gen_root_ca
-	$(OPENSSL_GEN_CA) \
+	$(OPENSSL) ca -batch -notext -create_serial \
 		-config etc/$(1)-ca.cnf \
 		-in $(2) -out $(3) \
 		-extensions $(1)_ca_ext \
@@ -33,7 +32,7 @@ endef
 
 # create intermediate ca
 define gen_intermediate_ca
-	$(OPENSSL_GEN_CA) \
+	$(OPENSSL) ca -batch -notext -create_serial \
 		-config etc/root-ca.cnf \
 		-in $(2) -out $(3) \
 		-extensions $(1)_ca_ext \
@@ -43,7 +42,7 @@ endef
 
 # create signing ca
 define gen_signing_ca
-	$(OPENSSL_GEN_CA) \
+	$(OPENSSL) ca -batch -notext -create_serial \
 		-config etc/intermediate-ca.cnf \
 		-in $(2) -out $(3) \
 		-extensions signing_ca_ext \
@@ -128,7 +127,7 @@ help:
 dist/%.csr:
 	@$(OPENSSL) req \
 		-new \
-		-newkey $(KEY_ALG) \
+		-newkey $(CPK_ALG) \
 		-config etc/$(MAKECMDGOALS).cnf \
 		-keyout dist/$*.key -out $@ -outform PEM
 
@@ -162,7 +161,7 @@ dist/%.pem: dist/%.crt
 # --- create tls client certificate --------------------------------------------
 .PHONY: client
 client: CA=component
-client: KEY_ALG=RSA:4096
+client: CPK_ALG=RSA:4096
 client: dist/$(FILENAME).p12
 
 # --- create tls certificate for fritzbox --------------------------------------
@@ -285,7 +284,7 @@ ca/private/%-ca.key: ca/private/%-ca.pwd
 		-aes256 -pass file:$<
 
 # create password for encrypted private keys
-ca/private/%-ca.pwd:
+ca/private/%.pwd:
 	@$(OPENSSL) rand -base64 32 > $@
 
 # create DER export of ca certificate
@@ -325,10 +324,10 @@ force-destroy:
 test:
 	$(MAKE) force-destroy
 	CAK_ALG=ED25519 $(MAKE) init
-	KEY_ALG=ED25519 $(MAKE) server CN=test.example.com SAN=DNS:test.example.com,DNS:www.example.com
-	KEY_ALG=ED25519 $(MAKE) fritzbox
-	KEY_ALG=ED25519 $(MAKE) rev-component CN=test.example.com
-	KEY_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="test@example.com"
+	CPK_ALG=ED25519 $(MAKE) server CN=test.example.com SAN=DNS:test.example.com,DNS:www.example.com
+	CPK_ALG=ED25519 $(MAKE) fritzbox
+	CPK_ALG=ED25519 $(MAKE) rev-component CN=test.example.com
+	CPK_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="test@example.com"
 
 # catch all unkown targets and inform
 # %:

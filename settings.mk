@@ -42,7 +42,7 @@ export DEFAULT_MD		?= sha3-256
 #CAK_ALG					?= ED448
 CAK_ALG					?= RSA -pkeyopt rsa_keygen_bits:8192
 
-# CRT Keys: param for openssl req -newkey $(KEY_ALG)
+# CRT Private Keys: param for openssl req -newkey $(KEY_ALG)
 # NOTE: ED25519 p12 client certificates still fail to import in Browsers
-#KEY_ALG					?= ED448
-KEY_ALG					?= RSA:$(DEFAULT_BITS)
+#CPK_ALG					?= ED448
+CPK_ALG					?= RSA:$(DEFAULT_BITS)
