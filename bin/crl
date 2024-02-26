@@ -3,31 +3,17 @@
 # shellcheck source=/dev/null
 source bin/log
 
-declare config=""
-declare passin=""
-declare out=""
+declare ca=""
 
 # Print usage information
 print_usage() {
-    echo "Usage: $0 --ca ca-slug --dir /path/to/CA/basedir"
+    echo "Usage: $0 --ca ca-slug"
 }
 
 # Check if required parameters are set
 chk_params() {
-    if [[ -z "${config}" ]]; then
-        log_err "parameter --config is required"
-        print_usage
-        exit 1
-    fi
-
-    if [[ -z "${passin}" ]]; then
-        log_err "parameter --passin is required"
-        print_usage
-        exit 1
-    fi
-
-    if [[ -z "${out}" ]]; then
-        log_err "parameter --out is required"
+    if [[ -z "${ca}" ]]; then
+        log_err "parameter --ca is required"
         print_usage
         exit 1
     fi
@@ -37,16 +23,8 @@ chk_params() {
 get_params() {
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --config)
-                config=$2
-                shift
-                ;;
-            --passin)
-                passin=$2
-                shift
-                ;;
-            --out)
-                out=$2
+            --ca)
+                ca=$2
                 shift
                 ;;
             *)
@@ -60,8 +38,16 @@ get_params() {
 }
 
 gen_crl() {
-	openssl ca -gencrl -config "${config}" -passin "${passin}" -out "${out}".pem
-	openssl crl -in "${out}".pem -out "${out}" -outform DER
+    log_info "Generating CRL for ${ca}"
+
+    openssl ca \
+        -gencrl \
+        -config "etc/${ca}-ca.cnf" \
+        -passin "file:ca/private/${ca}-ca.pwd" \
+        -out "pub/${ca}-ca.crl.pem"
+	openssl crl -in "pub/${ca}-ca.crl.pem" -out "pub/${ca}-ca.crl" -outform DER
+
+    log_info "Generated CRL for ${ca}"
 }
 
 # Main function

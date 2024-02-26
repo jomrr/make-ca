@@ -4,12 +4,11 @@
 source bin/log
 
 declare ca=""
-declare dir=""
 declare format=""
 
 # Print usage information
 print_usage() {
-    echo "Usage: $0 --ca slug --dir /path/to/out/dir --format PEM|PKCS7"
+    echo "Usage: $0 --ca slug --format PEM|PKCS7"
 }
 
 # Check if required parameters are set
@@ -20,16 +19,12 @@ chk_params() {
         exit 1
     fi
 
-    if [[ -z "${dir}" ]]; then
-        log_err "parameter --dir is required"
-        print_usage
-        exit 1
-    fi
     if [[ -z "${format}" ]]; then
-        log_err "parameter --dir is required"
+        log_err "parameter --format is required"
         print_usage
         exit 1
     fi
+
     if [[ "$format" != "pem" && "$format" != "p7c" ]]; then
         log_err "parameter --format must be 'pem' or 'p7c'"
         print_usage
@@ -43,10 +38,6 @@ get_params() {
         case $1 in
             --ca)
                 ca=$2
-                shift
-                ;;
-            --dir)
-                dir=$2
                 shift
                 ;;
             --format)
@@ -68,14 +59,14 @@ gen_chain_pem() {
     log_info "Creating PEM CA chain for ${ca}"
 
     if [[ "${ca}" == intermediate ]]; then
-        cat ${dir}/${ca}-ca.pem \
-            ${dir}/root-ca.pem  \
-            > ${dir}/${ca}-ca-chain.pem
+        cat pub/${ca}-ca.pem \
+            pub/root-ca.pem  \
+            > pub/${ca}-ca-chain.pem
     elif [[ "${ca}" != root && "${ca}" != intermediate ]]; then
-        cat ${dir}/${ca}-ca.pem \
-            ${dir}/intermediate-ca.pem \
-            ${dir}/root-ca.pem  \
-            > ${dir}/${ca}-ca-chain.pem
+        cat pub/${ca}-ca.pem \
+            pub/intermediate-ca.pem \
+            pub/root-ca.pem  \
+            > pub/${ca}-ca-chain.pem
     fi
 
     log_info "Created PEM CA chain for ${ca}"
@@ -87,8 +78,8 @@ gen_chain_p7c() {
 
     openssl crl2pkcs7 \
         -nocrl \
-        -certfile ${dir}/${ca}-ca-chain.pem \
-        -out ${dir}/${ca}-ca-chain.p7c \
+        -certfile pub/${ca}-ca-chain.pem \
+        -out pub/${ca}-ca-chain.p7c \
         -outform DER
 
     log_info "Created PKCS7 CA chain for ${ca}"

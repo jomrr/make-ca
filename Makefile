@@ -10,19 +10,6 @@ OPENSSL_GEN_CA	:= $(OPENSSL) ca -batch -notext -create_serial
 # ca default settings
 include			settings.mk
 
-# ca base directory
-CA_DIR			:= ca
-# archive directory
-ARCDIR			:= $(CA_DIR)/archive
-# certificate distribution directory for CRTs
-CRTDIR			:= dist
-# directory for openssl configuration files
-CNFDIR			:= etc
-# static configuration directory
-STCDIR			:= $(CNFDIR)/static
-# webroot, where CRLs, chains, etc. are placed
-WEBDIR			:= www
-
 # list of signing CAs, signed by intermediate
 SIGNING_CA		:= component identity
 ALL_CA			:= root intermediate $(SIGNING_CA)
@@ -37,31 +24,31 @@ FILENAME		?= $(if $(EMAIL),$(EMAIL),$(CN))
 # create root ca
 define gen_root_ca
 	$(OPENSSL_GEN_CA) \
-		-config $(CNFDIR)/$(1)-ca.cnf \
+		-config etc/$(1)-ca.cnf \
 		-in $(2) -out $(3) \
 		-extensions $(1)_ca_ext \
-		-passin file:$(CA_DIR)/private/$(1)-ca.pwd \
+		-passin file:ca/private/$(1)-ca.pwd \
 		-selfsign;
 endef
 
 # create intermediate ca
 define gen_intermediate_ca
 	$(OPENSSL_GEN_CA) \
-		-config $(CNFDIR)/root-ca.cnf \
+		-config etc/root-ca.cnf \
 		-in $(2) -out $(3) \
 		-extensions $(1)_ca_ext \
-		-passin file:$(CA_DIR)/private/root-ca.pwd \
-		-keyfile $(CA_DIR)/private/root-ca.key;
+		-passin file:ca/private/root-ca.pwd \
+		-keyfile ca/private/root-ca.key;
 endef
 
 # create signing ca
 define gen_signing_ca
 	$(OPENSSL_GEN_CA) \
-		-config $(CNFDIR)/intermediate-ca.cnf \
+		-config etc/intermediate-ca.cnf \
 		-in $(2) -out $(3) \
 		-extensions signing_ca_ext \
-		-passin file:$(CA_DIR)/private/intermediate-ca.pwd \
-		-keyfile $(CA_DIR)/private/intermediate-ca.key;
+		-passin file:ca/private/intermediate-ca.pwd \
+		-keyfile ca/private/intermediate-ca.key;
 endef
 
 # function to create root, intermediate and signing ca(s)
@@ -77,25 +64,25 @@ endef
 
 # archive files by CN
 define archive
-	$(eval APATH := $(ARCDIR)/$(1)-$(shell date +%Y-%m-%dT%H:%M:%S%z).tar.gz) \
+	$(eval APATH := ca/archive/$(1)-$(shell date +%Y-%m-%dT%H:%M:%S%z).tar.gz) \
 	tar -czvf $(APATH) \
-		$(shell find $(CRTDIR) -type f -regextype posix-extended \
+		$(shell find dist -type f -regextype posix-extended \
 		-regex ".*/$(1)\.[^\.]+$$") 2>&1 1>/dev/null && \
 	echo "$(APATH) created for CN=$(1)."
 endef
 
 # delete files by CN
 define delete
-	find $(CRTDIR) -type f -regextype posix-extended \
+	find dist -type f -regextype posix-extended \
 		-regex ".*/$(1)\.[^\.]+" -exec rm -f {} +
 endef
 
 # revoke a certificate by CN, CA and REASON
 define revoke
 	$(OPENSSL) ca -batch \
-		-config $(CNFDIR)/$(2)-ca.cnf \
-		-revoke $(CRTDIR)/$(1).crt \
-		-passin file:$(CA_DIR)/private/$(2)-ca.pwd \
+		-config etc/$(2)-ca.cnf \
+		-revoke dist/$(1).crt \
+		-passin file:ca/private/$(2)-ca.pwd \
 		-crl_reason $(3);
 endef
 
@@ -105,22 +92,22 @@ endef
 
 # keep these files
 .PRECIOUS: \
-	$(CA_DIR)/certs/%-ca.crt \
-	$(CA_DIR)/db/%-ca.txt \
-	$(CA_DIR)/db/%-ca.txt.attr \
-	$(CA_DIR)/private/%-ca.key \
-	$(CA_DIR)/private/%.pwd \
-	$(CA_DIR)/reqs/%-ca.csr \
-	$(CNFDIR)/%.cnf \
-	$(CRTDIR)/%.csr \
-	$(CRTDIR)/%.crt \
-	$(CRTDIR)/%.key \
-	$(CRTDIR)/%.p12 \
-	$(CRTDIR)/%.pem \
-	$(WEBDIR)/%-ca.cer \
-	$(WEBDIR)/%-ca.pem \
-	$(WEBDIR)/%-ca-chain.p7c \
-	$(WEBDIR)/%-ca-chain.pem
+	ca/certs/%-ca.crt \
+	ca/db/%-ca.txt \
+	ca/db/%-ca.txt.attr \
+	ca/private/%-ca.key \
+	ca/private/%.pwd \
+	ca/reqs/%-ca.csr \
+	etc/%.cnf \
+	dist/%.csr \
+	dist/%.crt \
+	dist/%.key \
+	dist/%.p12 \
+	dist/%.pem \
+	pub/%-ca.cer \
+	pub/%-ca.pem \
+	pub/%-ca-chain.p7c \
+	pub/%-ca-chain.pem
 
 # ******************************************************************************
 # make targets start here
@@ -138,59 +125,59 @@ help:
 # ==============================================================================
 
 # --- create CSR and KEY, config is selected by calling target -----------------
-$(CRTDIR)/%.csr:
+dist/%.csr:
 	@$(OPENSSL) req \
 		-new \
 		-newkey $(KEY_ALG) \
-		-config $(CNFDIR)/$(MAKECMDGOALS).cnf \
-		-keyout $(CRTDIR)/$*.key -out $@ -outform PEM
+		-config etc/$(MAKECMDGOALS).cnf \
+		-keyout dist/$*.key -out $@ -outform PEM
 
 # --- issue CRT by CA ----------------------------------------------------------
-$(CRTDIR)/%.crt: $(CRTDIR)/%.csr
+dist/%.crt: dist/%.csr
 	@echo CA=$(CA)
 	@$(OPENSSL) ca \
 		-batch \
 		-notext \
 		-create_serial \
-		-config $(CNFDIR)/$(CA)-ca.cnf \
+		-config etc/$(CA)-ca.cnf \
 		-in $< \
 		-out $@ \
 		-extensions $(MAKECMDGOALS)_ext \
-		-passin file:$(CA_DIR)/private/$(CA)-ca.pwd
+		-passin file:ca/private/$(CA)-ca.pwd
 
 # --- create pkcs12 bundle with key, crt and ca-chain --------------------------
-$(CRTDIR)/%.p12: $(CRTDIR)/%.crt
+dist/%.p12: dist/%.crt
 	@$(OPENSSL) pkcs12 \
 		-export \
 		-name "$*" \
-		-inkey $(CRTDIR)/$*.key \
+		-inkey dist/$*.key \
 		-in $< \
-    	-certfile $(WEBDIR)/$(CA)-ca-chain.pem \
+    	-certfile pub/$(CA)-ca-chain.pem \
 		-out $@
 
 # --- create pem bundle with crt and ca-chain -----------------------------
-$(CRTDIR)/%.pem: $(CRTDIR)/%.crt
-	@cat $(CRTDIR)/$*.crt $(WEBDIR)/$(CA)-ca-chain.pem > $@
+dist/%.pem: dist/%.crt
+	@cat dist/$*.crt pub/$(CA)-ca-chain.pem > $@
 
 # --- create tls client certificate --------------------------------------------
 .PHONY: client
 client: CA=component
 client: KEY_ALG=RSA:4096
-client: $(CRTDIR)/$(FILENAME).p12
+client: dist/$(FILENAME).p12
 
 # --- create tls certificate for fritzbox --------------------------------------
 .PHONY: fritzbox
 fritzbox: CA=component
-fritzbox: $(CRTDIR)/$(FRITZBOX_PUBLIC).myfritz.net.pem
+fritzbox: dist/$(FRITZBOX_PUBLIC).myfritz.net.pem
 
 # --- generate CRLs for all CAs ------------------------------------------------
 .PHONY: gencrls
-gencrls: $(foreach ca,$(ALL_CA),$(WEBDIR)/$(ca)-ca.crl)
+gencrls: $(foreach ca,$(ALL_CA),pub/$(ca)-ca.crl)
 
 # --- print CA db files with CA name for grepping serials, revoked, etc. -------
 .PHONY: print
 print:
-	@find $(CA_DIR)/db/ -type f -name "*.txt" -exec grep -H ^ {} + | \
+	@find ca/db/ -type f -name "*.txt" -exec grep -H ^ {} + | \
 		sed 's/.*\/\(.*\)\.txt:\(.*\)\/C=.*CN=\(.*\)/\2CN="\3" \1/' | \
 		tr '\t' ' ' | sort
 
@@ -201,7 +188,7 @@ rev-component:
 	@$(call archive,$(FILENAME))
 	@$(call revoke,$(FILENAME),$(CA),$(if $(REASON),$(REASON),superseded))
 	@$(call delete,$(FILENAME))
-	@$(MAKE) $(WEBDIR)/$(CA)-ca.crl
+	@$(MAKE) pub/$(CA)-ca.crl
 
 # --- revoke CRT by Identity CA and rebuild its CRL ----------------------------
 .PHONY: rev-identity
@@ -210,18 +197,18 @@ rev-identity:
 	@$(call archive,$(FILENAME))
 	@$(call revoke,$(FILENAME),$(CA),$(if $(REASON),$(REASON),superseded))
 	@$(call delete,$(FILENAME))
-	@$(MAKE) $(WEBDIR)/$(CA)-ca.crl
+	@$(MAKE) pub/$(CA)-ca.crl
 
 # --- create tls server certificate --------------------------------------------
 .PHONY: server
 server: CA=component
-server: $(CRTDIR)/$(FILENAME).pem
+server: dist/$(FILENAME).pem
 
 # --- create certificate with smime extensions ---------------------------------
 smime: CA=identity
 .PHONY: smime
 smime: CA=identity
-smime: $(CRTDIR)/$(FILENAME).pem
+smime: dist/$(FILENAME).pem
 
 # --- create certificates for static configurations ----------------------------
 .PHONY: static
@@ -245,7 +232,7 @@ distclean: clean
 # delete everything but make and the config dir
 .PHONY: destroy
 destroy:
-	@rm -Ir ./$(CA_DIR)/ ./$(CRTDIR)/ ./$(WEBDIR)/
+	@rm -Ir ./ca/ ./dist/ ./pub/
 
 # init all CAs and generate initial CRLs
 .PHONY: init
@@ -254,88 +241,85 @@ init: $(SIGNING_CA)
 
 # init root ca
 .PHONY: root
-root: %: $(CA_DIR)/db/%-ca.txt.attr $(WEBDIR)/%-ca.cer
+root: %: ca/db/%-ca.txt.attr pub/%-ca.cer
 
 # init intermediate ca, depends on root ca, so root will run if necessary
 .PHONY: intermediate
 intermediate: %: root \
-	$(CA_DIR)/db/%-ca.txt.attr \
-	$(WEBDIR)/%-ca.cer \
-	$(WEBDIR)/%-ca-chain.p7c
+	ca/db/%-ca.txt.attr \
+	pub/%-ca.cer \
+	pub/%-ca-chain.p7c
 
 # init signing CAs, depends on intermediate and implicitly on root
 .PHONY: $(SIGNING_CA)
 $(SIGNING_CA): %: intermediate \
-	$(CA_DIR)/db/%-ca.txt.attr \
-	$(WEBDIR)/%-ca.cer \
-	$(WEBDIR)/%-ca-chain.p7c
+	ca/db/%-ca.txt.attr \
+	pub/%-ca.cer \
+	pub/%-ca-chain.p7c
 
 # issue ca certificate
-$(CA_DIR)/certs/%-ca.crt: $(CA_DIR)/reqs/%-ca.csr
+ca/certs/%-ca.crt: ca/reqs/%-ca.csr
 	@$(call gen_ca,$*,$<,$@)
 
 # when ca db is newer than crl, we create it
-$(CA_DIR)/db/%-ca.txt:
+ca/db/%-ca.txt:
 
 # create ca filesystem structure
-$(CA_DIR)/db/%-ca.txt.attr:
-	@bin/prepare --ca $* --dir $(CA_DIR)
+ca/db/%-ca.txt.attr:
+	@bin/prepare --ca $*
 
 # create ca certificate signing request
-$(CA_DIR)/reqs/%-ca.csr: $(CA_DIR)/private/%-ca.key
+ca/reqs/%-ca.csr: ca/private/%-ca.key
 	@$(OPENSSL) req \
 		-batch  \
 		-new \
-		-config $(CNFDIR)/$*-ca.cnf \
+		-config etc/$*-ca.cnf \
 		-out $@ -outform PEM \
 		-key $< -passin file:$(patsubst %.key,%.pwd,$<)
 
 # create ca private key
-$(CA_DIR)/private/%-ca.key: $(CA_DIR)/private/%-ca.pwd
+ca/private/%-ca.key: ca/private/%-ca.pwd
 	@$(OPENSSL) genpkey \
 		-out $@ \
 		-algorithm $(CAK_ALG) \
 		-aes256 -pass file:$<
 
 # create password for encrypted private keys
-$(CA_DIR)/private/%.pwd:
+ca/private/%-ca.pwd:
 	@$(OPENSSL) rand -base64 32 > $@
 
 # create DER export of ca certificate
-$(WEBDIR)/%-ca.cer: $(WEBDIR)/%-ca.pem
+pub/%-ca.cer: pub/%-ca.pem
 	@$(OPENSSL) x509 \
-		-in $(WEBDIR)/$*-ca.pem \
-		-out $(WEBDIR)/$*-ca.cer \
+		-in pub/$*-ca.pem \
+		-out pub/$*-ca.cer \
 		-outform DER
 
 # create crl for ca and run when ca db is newer than crl
-$(WEBDIR)/%-ca.crl: $(CA_DIR)/db/%-ca.txt
-	@bin/crl \
-		--config $(CNFDIR)/$*-ca.cnf \
-		--passin file:$(CA_DIR)/private/$*-ca.pwd \
-		--out $@
+pub/%-ca.crl: ca/db/%-ca.txt
+	@bin/crl --ca $*
 
 # export ca certificate in PEM format. it already should be.
-$(WEBDIR)/%-ca.pem: $(CA_DIR)/certs/%-ca.crt
+pub/%-ca.pem: ca/certs/%-ca.crt
 	@$(OPENSSL) x509 \
-		-in $(CA_DIR)/certs/$*-ca.crt \
-		-out $(WEBDIR)/$*-ca.pem \
+		-in ca/certs/$*-ca.crt \
+		-out pub/$*-ca.pem \
 		-outform PEM
 
 # create PKCS7 certificate chain for ca
-$(WEBDIR)/%-ca-chain.p7c: $(WEBDIR)/%-ca-chain.pem
-	@bin/chain --ca $* --dir $(WEBDIR) --format p7c
+pub/%-ca-chain.p7c: pub/%-ca-chain.pem
+	@bin/chain --ca $* --format p7c
 
 # create PEM certificate chain for ca
-$(WEBDIR)/%-ca-chain.pem: $(WEBDIR)/%-ca.pem
-	@bin/chain --ca $* --dir $(WEBDIR) --format pem
+pub/%-ca-chain.pem: pub/%-ca.pem
+	@bin/chain --ca $* --format pem
 
 # ==============================================================================
 # general purpose targets
 # ==============================================================================
 
 force-destroy:
-	@rm -rf ./$(CA_DIR)/ ./$(CRTDIR)/ ./$(WEBDIR)/
+	@rm -rf ./ca/ ./dist/ ./pub/
 
 .PHONY: test
 test:
