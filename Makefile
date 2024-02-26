@@ -95,7 +95,7 @@ endef
 	ca/db/%-ca.txt \
 	ca/db/%-ca.txt.attr \
 	ca/private/%-ca.key \
-	ca/private/%.pwd \
+	ca/private/%-ca.pwd \
 	ca/reqs/%-ca.csr \
 	etc/%.cnf \
 	dist/%.csr \
@@ -284,7 +284,7 @@ ca/private/%-ca.key: ca/private/%-ca.pwd
 		-aes256 -pass file:$<
 
 # create password for encrypted private keys
-ca/private/%.pwd:
+ca/private/%-ca.pwd:
 	@$(OPENSSL) rand -base64 32 > $@
 
 # create DER export of ca certificate
