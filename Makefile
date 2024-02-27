@@ -15,17 +15,12 @@ SIGNING_CA		:= intermediate
 ISSUING_CA		:= component identity
 ALL_CA			:= $(ROOT_CA) $(SIGNING_CA) $(ISSUING_CA)
 
-# certificate settings
+# operational settings
 FILENAME		?= $(if $(EMAIL),$(EMAIL),$(CN))
-
-# archive files by CN
-define archive
-	$(eval APATH := ca/archive/$(1)-$(shell date +%Y-%m-%dT%H:%M:%S%z).tar.gz) \
-	tar -czvf $(APATH) \
-		$(shell find dist -type f -regextype posix-extended \
-		-regex ".*/$(1)\.[^\.]+$$") 2>&1 1>/dev/null && \
-	echo "$(APATH) created for CN=$(1)."
-endef
+DATETIME		:= $(shell date +%Y-%m-%dT%H:%M:%S%z)
+ARCHPATH		:= ca/archive/$(FILENAME)-$(DATETIME).tar.gz
+ARCHFILES		:= $(shell find dist -type f -regextype posix-extended \
+		-regex ".*/$(FILENAME)\.[^\.]+$$")
 
 # delete files by CN
 define delete
@@ -61,7 +56,7 @@ endef
 	dist/%.key \
 	dist/%.p12 \
 	dist/%.pem \
-	pub/%-ca.cer \
+	pub/%-ca.der \
 	pub/%-ca.pem \
 	pub/%-ca-chain.p7c \
 	pub/%-ca-chain.pem
@@ -131,23 +126,18 @@ print:
 		}' "$$DB"; \
 	done
 
-# revoke CRT by Component CA and rebuild its CRL
-.PHONY: rev-component
-rev-component: CA=component
-rev-component:
-	@$(call archive,$(FILENAME))
-	@$(call revoke,$(FILENAME),$(CA),$(if $(REASON),$(REASON),superseded))
-	@$(call delete,$(FILENAME))
-	@$(MAKE) pub/$(CA)-ca.crl
+# revoke CRT by CA and rebuild its CRL
+REVOKE_TARGETS := $(foreach ca,$(ISSUING_CA),revoke-$(ca))
 
-# revoke CRT by Identity CA and rebuild its CRL
-.PHONY: rev-identity
-rev-identity: CA=identity
-rev-identity:
-	@$(call archive,$(FILENAME))
-	@$(call revoke,$(FILENAME),$(CA),$(if $(REASON),$(REASON),superseded))
+.PHONY: $(REVOKE_TARGETS)
+$(REVOKE_TARGETS): revoke-%: $(ARCHPATH)
+	@$(call revoke,$(FILENAME),$*,$(if $(REASON),$(REASON),superseded))
 	@$(call delete,$(FILENAME))
-	@$(MAKE) pub/$(CA)-ca.crl
+	@$(MAKE) pub/$*-ca.crl
+
+ca/archive/%.tar.gz:
+	@mkdir -m 700 -p ca/archive
+	@tar -czvf $(ARCHPATH) $(ARCHFILES)
 
 # create tls server certificate
 .PHONY: server
@@ -191,14 +181,14 @@ pub/%-ca-chain.p7c: pub/%-ca-chain.pem
 	@bin/chain --ca $* --format p7c
 
 # create PEM certificate chain for ca
-pub/%-ca-chain.pem: pub/%-ca.cer
+pub/%-ca-chain.pem: pub/%-ca.der
 	@bin/chain --ca $* --format pem
 
 # create DER export of ca certificate
-pub/%-ca.cer: pub/%-ca.pem
+pub/%-ca.der: pub/%-ca.pem
 	@/usr/bin/openssl x509 \
 		-in pub/$*-ca.pem \
-		-out pub/$*-ca.cer \
+		-out pub/$*-ca.der \
 		-outform DER
 
 # export ca certificate in PEM format. it already should be.
@@ -249,7 +239,7 @@ test:
 	CAK_ALG=ED25519 $(MAKE) init 1>/dev/null
 	CPK_ALG=ED25519 $(MAKE) server CN=test.example.com SAN=DNS:www.example.com 1>/dev/null
 	CPK_ALG=ED25519 $(MAKE) fritzbox 1>/dev/null
-	CPK_ALG=ED25519 $(MAKE) rev-component CN=test.example.com 1>/dev/null
+	CPK_ALG=ED25519 $(MAKE) revoke-component CN=test.example.com 1>/dev/null
 	CPK_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="test@example.com" 1>/dev/null
 
 # catch all unkown targets and inform

@@ -41,11 +41,11 @@ prepare_ca() {
     log_info "Creating directory structure for ${ca}"
     
     mkdir -m 755 -p ca/{certs,reqs} dist pub
-	mkdir -m 750 -p ca/{archive,db,new,private}
+	mkdir -m 700 -p ca/{archive,db,new,private}
 	
-    install -m 640 /dev/null ca/db/${ca}-ca.txt
-	install -m 640 /dev/null ca/db/${ca}-ca.txt.attr
-	install -m 640 /dev/null ca/db/${ca}-ca.crl.srl
+    install -m 600 /dev/null ca/db/${ca}-ca.txt
+	install -m 600 /dev/null ca/db/${ca}-ca.txt.attr
+	install -m 600 /dev/null ca/db/${ca}-ca.crl.srl
 	
     date > ca/db/${ca}-ca.dat
     echo "unique_subject = no" > ca/db/${ca}-ca.txt.attr
