@@ -186,9 +186,6 @@ pub/intermediate-ca.crl: pub/root-ca-chain.p7c pub/intermediate-ca-chain.p7c ca/
 pub/%-ca.crl: pub/intermediate-ca-chain.p7c pub/%-ca-chain.p7c ca/db/%-ca.txt
 	@bin/crl --ca $*
 
-ca/db/%-ca.txt:
-	@test -f $@ || bin/prepare --ca $*
-
 # create PKCS7 certificate chain for ca
 pub/%-ca-chain.p7c: pub/%-ca-chain.pem
 	@bin/chain --ca $* --format p7c
@@ -236,7 +233,7 @@ ca/private/%-ca.pwd: ca/db/%-ca.dat
 	@/usr/bin/openssl rand -base64 64 > $@
 
 # create ca db file and structure
-ca/db/%-ca.dat:
+ca/db/%-ca.dat ca/db/%-ca.txt:
 	@test -f $@ || bin/prepare --ca $*
 
 # destroy everything without asking
