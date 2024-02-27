@@ -122,9 +122,14 @@ fritzbox: dist/$(FRITZBOX_PUBLIC).myfritz.net.pem
 # print CA db files with CA name for grepping serials, revoked, etc.
 .PHONY: print
 print:
-	@find ca/db/ -type f -name "*.txt" -exec grep -H ^ {} + | \
-		sed 's/.*\/\(.*\)\.txt:\(.*\)\/C=.*CN=\(.*\)/\2CN="\3" \1/' | \
-		tr '\t' ' ' | sort
+	@for DB in ca/db/*-ca.txt; do \
+		BASENAME=$$(basename "$$DB" .txt); \
+		CA_SLUG=$$(echo "$$BASENAME" | cut -d '-' -f1); \
+		awk -v filename="$$CA_SLUG" '{ \
+			gsub(/[ \t]+/, " "); \
+			printf "%-12s: %s\n", filename, $$0; \
+		}' "$$DB"; \
+	done
 
 # revoke CRT by Component CA and rebuild its CRL
 .PHONY: rev-component
