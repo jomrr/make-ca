@@ -47,6 +47,7 @@ prepare_ca() {
 	install -m 640 /dev/null ca/db/${ca}-ca.txt.attr
 	install -m 640 /dev/null ca/db/${ca}-ca.crl.srl
 	
+    echo "unique_subject = no" > ca/db/${ca}-ca.txt.attr
     echo 01 > ca/db/${ca}-ca.crl.srl
 
     log_info "Finished creating directory structure ${ca}"
