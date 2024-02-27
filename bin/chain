@@ -57,8 +57,9 @@ get_params() {
 # Generate PEM CA chain
 gen_chain_pem() {
     log_info "Creating PEM CA chain for ${ca}"
-
-    if [[ "${ca}" == intermediate ]]; then
+    if [[ "${ca}" == root ]]; then
+        cat pub/root-ca.pem > pub/${ca}-ca-chain.pem
+    elif [[ "${ca}" == intermediate ]]; then
         cat pub/${ca}-ca.pem \
             pub/root-ca.pem  \
             > pub/${ca}-ca-chain.pem

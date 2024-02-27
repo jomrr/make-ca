@@ -16,10 +16,6 @@ ALL_CA			:= root intermediate $(SIGNING_CA)
 # certificate settings
 FILENAME		?= $(if $(EMAIL),$(EMAIL),$(CN))
 
-# ******************************************************************************
-# ca functions
-# ******************************************************************************
-
 # archive files by CN
 define archive
 	$(eval APATH := ca/archive/$(1)-$(shell date +%Y-%m-%dT%H:%M:%S%z).tar.gz) \
@@ -41,7 +37,7 @@ define revoke
 		-config etc/$(2)-ca.cnf \
 		-revoke dist/$(1).crt \
 		-passin file:ca/private/$(2)-ca.pwd \
-		-crl_reason $(3);
+		-crl_reason $(3)
 endef
 
 # ******************************************************************************
@@ -51,6 +47,7 @@ endef
 # keep these files
 .PRECIOUS: \
 	ca/certs/%-ca.crt \
+	ca/db/%-ca.dat \
 	ca/db/%-ca.txt \
 	ca/db/%-ca.txt.attr \
 	ca/private/%-ca.key \
@@ -70,17 +67,10 @@ endef
 # ******************************************************************************
 # make targets start here
 # ******************************************************************************
-#
-# help and usage
-# ==============================================================================
 
 .PHONY: help
 help:
 	@bin/$@
-
-# ==============================================================================
-# targets for operating the CAs
-# ==============================================================================
 
 # --- create CSR and KEY, config is selected by calling target -----------------
 dist/%.csr:
@@ -128,10 +118,6 @@ client: dist/$(FILENAME).p12
 fritzbox: CA=component
 fritzbox: dist/$(FRITZBOX_PUBLIC).myfritz.net.pem
 
-# --- generate CRLs for all CAs ------------------------------------------------
-.PHONY: gencrls
-gencrls: $(foreach ca,$(ALL_CA),pub/$(ca)-ca.crl)
-
 # --- print CA db files with CA name for grepping serials, revoked, etc. -------
 .PHONY: print
 print:
@@ -167,16 +153,12 @@ server: dist/$(FILENAME).pem
 smime: CA=identity
 smime: dist/$(FILENAME).pem
 
-# ==============================================================================
-# targets for initializing or destroying the CAs
-# ==============================================================================
-
 # delete CSRs
 .PHONY: clean
 clean:
 	@rm dist/$(FILENAME).csr
 
-# delete KEYs and CERTs
+# delete KEYs and CERTs and also CSRs through clean
 .PHONY: distclean
 distclean: clean
 	@rm dist/$(FILENAME).{crt,key,pem,p12}
@@ -188,37 +170,51 @@ destroy:
 
 # init all CAs and generate initial CRLs
 .PHONY: init
-init: $(SIGNING_CA)
-	@$(MAKE) gencrls
+init: crls
 
-# init root ca
-.PHONY: root
-root: %: ca/db/%-ca.txt.attr pub/%-ca.cer
+.PHONY: crls
+crls: pub/root-ca.crl pub/intermediate-ca.crl $(foreach ca,$(SIGNING_CA),pub/$(ca)-ca.crl)
+
+# create crl for ca, runs when ca db is newer than crl
+pub/root-ca.crl: pub/root-ca-chain.p7c ca/db/root-ca.txt
+	@bin/crl --ca root
 
 # init intermediate ca, depends on root ca, so root will run if necessary
-.PHONY: intermediate
-intermediate: %: root \
-	ca/db/%-ca.txt.attr \
-	pub/%-ca.cer \
-	pub/%-ca-chain.p7c
+pub/intermediate-ca.crl: pub/root-ca-chain.p7c pub/intermediate-ca-chain.p7c ca/db/intermediate-ca.txt
+	@bin/crl --ca intermediate
 
 # init signing CAs, depends on intermediate and implicitly on root
-.PHONY: $(SIGNING_CA)
-$(SIGNING_CA): %: intermediate \
-	ca/db/%-ca.txt.attr \
-	pub/%-ca.cer \
-	pub/%-ca-chain.p7c
+pub/%-ca.crl: pub/intermediate-ca-chain.p7c pub/%-ca-chain.p7c ca/db/%-ca.txt
+	@bin/crl --ca $*
+
+ca/db/%-ca.txt:
+	@echo "THIS IS AN ERROR"
+
+# create PKCS7 certificate chain for ca
+pub/%-ca-chain.p7c: pub/%-ca-chain.pem
+	@bin/chain --ca $* --format p7c
+
+# create PEM certificate chain for ca
+pub/%-ca-chain.pem: pub/%-ca.cer
+	@bin/chain --ca $* --format pem
+
+# create DER export of ca certificate
+pub/%-ca.cer: pub/%-ca.pem
+	@/usr/bin/openssl x509 \
+		-in pub/$*-ca.pem \
+		-out pub/$*-ca.cer \
+		-outform DER
+
+# export ca certificate in PEM format. it already should be.
+pub/%-ca.pem: ca/certs/%-ca.crt
+	@/usr/bin/openssl x509 \
+		-in ca/certs/$*-ca.crt \
+		-out pub/$*-ca.pem \
+		-outform PEM
 
 # issue ca certificate
 ca/certs/%-ca.crt: ca/reqs/%-ca.csr
 	@bin/ca-crt --ca $*
-
-# when ca db is newer than crl, we create it
-ca/db/%-ca.txt:
-
-# create ca filesystem structure
-ca/db/%-ca.txt.attr:
-	@bin/prepare --ca $*
 
 # create ca certificate signing request
 ca/reqs/%-ca.csr: ca/private/%-ca.key
@@ -237,42 +233,18 @@ ca/private/%-ca.key: ca/private/%-ca.pwd
 		-aes256 -pass file:$<
 
 # create password for encrypted private keys
-ca/private/%-ca.pwd:
+ca/private/%-ca.pwd: ca/db/%-ca.dat
 	@/usr/bin/openssl rand -base64 64 > $@
 
-# create DER export of ca certificate
-pub/%-ca.cer: pub/%-ca.pem
-	@/usr/bin/openssl x509 \
-		-in pub/$*-ca.pem \
-		-out pub/$*-ca.cer \
-		-outform DER
+# create ca db file and structure
+ca/db/%-ca.dat:
+	@bin/prepare --ca $*
 
-# create crl for ca and run when ca db is newer than crl
-pub/%-ca.crl: ca/db/%-ca.txt
-	@bin/crl --ca $*
-
-# export ca certificate in PEM format. it already should be.
-pub/%-ca.pem: ca/certs/%-ca.crt
-	@/usr/bin/openssl x509 \
-		-in ca/certs/$*-ca.crt \
-		-out pub/$*-ca.pem \
-		-outform PEM
-
-# create PKCS7 certificate chain for ca
-pub/%-ca-chain.p7c: pub/%-ca-chain.pem
-	@bin/chain --ca $* --format p7c
-
-# create PEM certificate chain for ca
-pub/%-ca-chain.pem: pub/%-ca.pem
-	@bin/chain --ca $* --format pem
-
-# ==============================================================================
-# general purpose targets
-# ==============================================================================
-
+# destroy everything without asking
 force-destroy:
 	@rm -rf ./ca/ ./dist/ ./pub/
 
+# test all targets
 .PHONY: test
 test:
 	$(MAKE) force-destroy
