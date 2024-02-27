@@ -74,7 +74,7 @@ endef
 help:
 	@bin/$@
 
-# --- create CSR and KEY, config is selected by calling target -----------------
+#create CSR and KEY, config is selected by calling target
 dist/%.csr:
 	@/usr/bin/openssl req \
 		-new \
@@ -82,9 +82,8 @@ dist/%.csr:
 		-config etc/$(MAKECMDGOALS).cnf \
 		-keyout dist/$*.key -out $@ -outform PEM
 
-# --- issue CRT by CA ----------------------------------------------------------
+#issue CRT by CA
 dist/%.crt: dist/%.csr
-	@echo CA=$(CA)
 	@/usr/bin/openssl ca \
 		-batch \
 		-notext \
@@ -95,7 +94,7 @@ dist/%.crt: dist/%.csr
 		-extensions $(MAKECMDGOALS)_ext \
 		-passin file:ca/private/$(CA)-ca.pwd
 
-# --- create pkcs12 bundle with key, crt and ca-chain --------------------------
+#create pkcs12 bundle with key, crt and ca-chain
 dist/%.p12: dist/%.crt
 	@/usr/bin/openssl pkcs12 \
 		-export \
@@ -105,29 +104,29 @@ dist/%.p12: dist/%.crt
     	-certfile pub/$(CA)-ca-chain.pem \
 		-out $@
 
-# --- create pem bundle with crt and ca-chain -----------------------------
+#create pem bundle with crt and ca-chain
 dist/%.pem: dist/%.crt
 	@cat dist/$*.crt pub/$(CA)-ca-chain.pem > $@
 
-# --- create tls client certificate --------------------------------------------
+#create tls client certificate
 .PHONY: client
 client: CA=component
 client: CPK_ALG=RSA:4096
 client: dist/$(FILENAME).p12
 
-# --- create tls certificate for fritzbox --------------------------------------
+# create tls certificate for fritzbox
 .PHONY: fritzbox
 fritzbox: CA=component
 fritzbox: dist/$(FRITZBOX_PUBLIC).myfritz.net.pem
 
-# --- print CA db files with CA name for grepping serials, revoked, etc. -------
+# print CA db files with CA name for grepping serials, revoked, etc.
 .PHONY: print
 print:
 	@find ca/db/ -type f -name "*.txt" -exec grep -H ^ {} + | \
 		sed 's/.*\/\(.*\)\.txt:\(.*\)\/C=.*CN=\(.*\)/\2CN="\3" \1/' | \
 		tr '\t' ' ' | sort
 
-# --- revoke CRT by Component CA and rebuild its CRL ---------------------------
+# revoke CRT by Component CA and rebuild its CRL
 .PHONY: rev-component
 rev-component: CA=component
 rev-component:
@@ -136,7 +135,7 @@ rev-component:
 	@$(call delete,$(FILENAME))
 	@$(MAKE) pub/$(CA)-ca.crl
 
-# --- revoke CRT by Identity CA and rebuild its CRL ----------------------------
+# revoke CRT by Identity CA and rebuild its CRL
 .PHONY: rev-identity
 rev-identity: CA=identity
 rev-identity:
@@ -145,12 +144,12 @@ rev-identity:
 	@$(call delete,$(FILENAME))
 	@$(MAKE) pub/$(CA)-ca.crl
 
-# --- create tls server certificate --------------------------------------------
+# create tls server certificate
 .PHONY: server
 server: CA=component
 server: dist/$(FILENAME).pem
 
-# --- create certificate with smime extensions ---------------------------------
+# create certificate with smime extensions
 .PHONY: smime
 smime: CA=identity
 smime: dist/$(FILENAME).pem
@@ -170,20 +169,16 @@ distclean: clean
 destroy:
 	@rm -Ir ./ca/ ./dist/ ./pub/
 
+# destroy everything without asking
+force-destroy:
+	@rm -rf ./ca/ ./dist/ ./pub/
+
 # init all CAs and generate initial CRLs
 .PHONY: init crls
 init crls: $(foreach ca,$(ALL_CA),pub/$(ca)-ca.crl)
 
-# create crl for ca, runs when ca db is newer than crl
-pub/root-ca.crl: pub/root-ca-chain.p7c ca/db/root-ca.txt
-	@bin/crl --ca root
-
-# init intermediate ca, depends on root ca, so root will run if necessary
-pub/intermediate-ca.crl: pub/root-ca-chain.p7c pub/intermediate-ca-chain.p7c ca/db/intermediate-ca.txt
-	@bin/crl --ca intermediate
-
-# init signing CAs, depends on intermediate and implicitly on root
-pub/%-ca.crl: pub/intermediate-ca-chain.p7c pub/%-ca-chain.p7c ca/db/%-ca.txt
+# generate CRL for CAs and initialize if needed
+pub/%-ca.crl: pub/%-ca-chain.p7c ca/db/%-ca.txt
 	@bin/crl --ca $*
 
 # create PKCS7 certificate chain for ca
@@ -212,6 +207,12 @@ pub/%-ca.pem: ca/certs/%-ca.crt
 ca/certs/%-ca.crt: ca/reqs/%-ca.csr
 	@bin/ca-crt --ca $*
 
+# additional dependency for Intermediate CA
+ca/certs/intermediate-ca.crt: ca/certs/root-ca.crt
+
+# additional dependency for Issuing CAs
+$(foreach ca,$(ISSUING_CA),ca/certs/$(ca)-ca.crt): ca/certs/intermediate-ca.crt
+
 # create ca certificate signing request
 ca/reqs/%-ca.csr: ca/private/%-ca.key
 	@/usr/bin/openssl req \
@@ -236,19 +237,15 @@ ca/private/%-ca.pwd: ca/db/%-ca.dat
 ca/db/%-ca.dat ca/db/%-ca.txt:
 	@test -f $@ || bin/prepare --ca $*
 
-# destroy everything without asking
-force-destroy:
-	@rm -rf ./ca/ ./dist/ ./pub/
-
 # test all targets
 .PHONY: test
 test:
-	$(MAKE) force-destroy
-	CAK_ALG=ED25519 $(MAKE) init
-	CPK_ALG=ED25519 $(MAKE) server CN=test.example.com SAN=DNS:www.example.com
-	CPK_ALG=ED25519 $(MAKE) fritzbox
-	CPK_ALG=ED25519 $(MAKE) rev-component CN=test.example.com
-	CPK_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="test@example.com"
+	$(MAKE) force-destroy 1>/dev/null
+	CAK_ALG=ED25519 $(MAKE) init 1>/dev/null
+	CPK_ALG=ED25519 $(MAKE) server CN=test.example.com SAN=DNS:www.example.com 1>/dev/null
+	CPK_ALG=ED25519 $(MAKE) fritzbox 1>/dev/null
+	CPK_ALG=ED25519 $(MAKE) rev-component CN=test.example.com 1>/dev/null
+	CPK_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="test@example.com" 1>/dev/null
 
 # catch all unkown targets and inform
 # %:
