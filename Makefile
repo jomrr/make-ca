@@ -188,7 +188,7 @@ pub/%-ca.crl: pub/intermediate-ca-chain.p7c pub/%-ca-chain.p7c ca/db/%-ca.txt
 	@bin/crl --ca $*
 
 ca/db/%-ca.txt:
-	@echo "THIS IS AN ERROR"
+	@test -f $@ || bin/prepare --ca $*
 
 # create PKCS7 certificate chain for ca
 pub/%-ca-chain.p7c: pub/%-ca-chain.pem
@@ -238,7 +238,7 @@ ca/private/%-ca.pwd: ca/db/%-ca.dat
 
 # create ca db file and structure
 ca/db/%-ca.dat:
-	@bin/prepare --ca $*
+	@test -f $@ || bin/prepare --ca $*
 
 # destroy everything without asking
 force-destroy:
