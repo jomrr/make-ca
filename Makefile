@@ -20,47 +20,6 @@ FILENAME		?= $(if $(EMAIL),$(EMAIL),$(CN))
 # ca functions
 # ******************************************************************************
 
-# create root ca
-define gen_root_ca
-	$(OPENSSL) ca -batch -notext -create_serial \
-		-config etc/$(1)-ca.cnf \
-		-in $(2) -out $(3) \
-		-extensions $(1)_ca_ext \
-		-passin file:ca/private/$(1)-ca.pwd \
-		-selfsign;
-endef
-
-# create intermediate ca
-define gen_intermediate_ca
-	$(OPENSSL) ca -batch -notext -create_serial \
-		-config etc/root-ca.cnf \
-		-in $(2) -out $(3) \
-		-extensions $(1)_ca_ext \
-		-passin file:ca/private/root-ca.pwd \
-		-keyfile ca/private/root-ca.key;
-endef
-
-# create signing ca
-define gen_signing_ca
-	$(OPENSSL) ca -batch -notext -create_serial \
-		-config etc/intermediate-ca.cnf \
-		-in $(2) -out $(3) \
-		-extensions signing_ca_ext \
-		-passin file:ca/private/intermediate-ca.pwd \
-		-keyfile ca/private/intermediate-ca.key;
-endef
-
-# function to create root, intermediate and signing ca(s)
-define gen_ca
-	if [ $(1) = root ]; then \
-		$(call gen_root_ca,$(1),$(2),$(3)) \
-	elif [ $(1) = intermediate ]; then \
-		$(call gen_intermediate_ca,$(1),$(2),$(3)) \
-	else \
-		$(call gen_signing_ca,$(1),$(2),$(3)) \
-	fi
-endef
-
 # archive files by CN
 define archive
 	$(eval APATH := ca/archive/$(1)-$(shell date +%Y-%m-%dT%H:%M:%S%z).tar.gz) \
@@ -78,7 +37,7 @@ endef
 
 # revoke a certificate by CN, CA and REASON
 define revoke
-	$(OPENSSL) ca -batch \
+	/usr/bin/openssl ca -batch \
 		-config etc/$(2)-ca.cnf \
 		-revoke dist/$(1).crt \
 		-passin file:ca/private/$(2)-ca.pwd \
@@ -125,7 +84,7 @@ help:
 
 # --- create CSR and KEY, config is selected by calling target -----------------
 dist/%.csr:
-	@$(OPENSSL) req \
+	@/usr/bin/openssl req \
 		-new \
 		-newkey $(CPK_ALG) \
 		-config etc/$(MAKECMDGOALS).cnf \
@@ -134,7 +93,7 @@ dist/%.csr:
 # --- issue CRT by CA ----------------------------------------------------------
 dist/%.crt: dist/%.csr
 	@echo CA=$(CA)
-	@$(OPENSSL) ca \
+	@/usr/bin/openssl ca \
 		-batch \
 		-notext \
 		-create_serial \
@@ -146,7 +105,7 @@ dist/%.crt: dist/%.csr
 
 # --- create pkcs12 bundle with key, crt and ca-chain --------------------------
 dist/%.p12: dist/%.crt
-	@$(OPENSSL) pkcs12 \
+	@/usr/bin/openssl pkcs12 \
 		-export \
 		-name "$*" \
 		-inkey dist/$*.key \
@@ -204,15 +163,9 @@ server: CA=component
 server: dist/$(FILENAME).pem
 
 # --- create certificate with smime extensions ---------------------------------
-smime: CA=identity
 .PHONY: smime
 smime: CA=identity
 smime: dist/$(FILENAME).pem
-
-# --- create certificates for static configurations ----------------------------
-.PHONY: static
-static:
-	@echo $(SERVERS)
 
 # ==============================================================================
 # targets for initializing or destroying the CAs
@@ -258,7 +211,7 @@ $(SIGNING_CA): %: intermediate \
 
 # issue ca certificate
 ca/certs/%-ca.crt: ca/reqs/%-ca.csr
-	@$(call gen_ca,$*,$<,$@)
+	@bin/ca-crt --ca $*
 
 # when ca db is newer than crl, we create it
 ca/db/%-ca.txt:
@@ -269,7 +222,7 @@ ca/db/%-ca.txt.attr:
 
 # create ca certificate signing request
 ca/reqs/%-ca.csr: ca/private/%-ca.key
-	@$(OPENSSL) req \
+	@/usr/bin/openssl req \
 		-batch  \
 		-new \
 		-config etc/$*-ca.cnf \
@@ -278,18 +231,18 @@ ca/reqs/%-ca.csr: ca/private/%-ca.key
 
 # create ca private key
 ca/private/%-ca.key: ca/private/%-ca.pwd
-	@$(OPENSSL) genpkey \
+	@/usr/bin/openssl genpkey \
 		-out $@ \
 		-algorithm $(CAK_ALG) \
 		-aes256 -pass file:$<
 
 # create password for encrypted private keys
 ca/private/%-ca.pwd:
-	@$(OPENSSL) rand -base64 32 > $@
+	@/usr/bin/openssl rand -base64 64 > $@
 
 # create DER export of ca certificate
 pub/%-ca.cer: pub/%-ca.pem
-	@$(OPENSSL) x509 \
+	@/usr/bin/openssl x509 \
 		-in pub/$*-ca.pem \
 		-out pub/$*-ca.cer \
 		-outform DER
@@ -300,7 +253,7 @@ pub/%-ca.crl: ca/db/%-ca.txt
 
 # export ca certificate in PEM format. it already should be.
 pub/%-ca.pem: ca/certs/%-ca.crt
-	@$(OPENSSL) x509 \
+	@/usr/bin/openssl x509 \
 		-in ca/certs/$*-ca.crt \
 		-out pub/$*-ca.pem \
 		-outform PEM
@@ -324,7 +277,7 @@ force-destroy:
 test:
 	$(MAKE) force-destroy
 	CAK_ALG=ED25519 $(MAKE) init
-	CPK_ALG=ED25519 $(MAKE) server CN=test.example.com SAN=DNS:test.example.com,DNS:www.example.com
+	CPK_ALG=ED25519 $(MAKE) server CN=test.example.com SAN=DNS:www.example.com
 	CPK_ALG=ED25519 $(MAKE) fritzbox
 	CPK_ALG=ED25519 $(MAKE) rev-component CN=test.example.com
 	CPK_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="test@example.com"
