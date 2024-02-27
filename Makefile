@@ -9,9 +9,11 @@ OPENSSL			:= /usr/bin/openssl
 # ca default settings
 include			settings.mk
 
-# list of signing CAs, signed by intermediate
-SIGNING_CA		:= component identity
-ALL_CA			:= root intermediate $(SIGNING_CA)
+# list of CA slugs
+ROOT_CA			:= root
+SIGNING_CA		:= intermediate
+ISSUING_CA		:= component identity
+ALL_CA			:= $(ROOT_CA) $(SIGNING_CA) $(ISSUING_CA)
 
 # certificate settings
 FILENAME		?= $(if $(EMAIL),$(EMAIL),$(CN))
@@ -169,11 +171,8 @@ destroy:
 	@rm -Ir ./ca/ ./dist/ ./pub/
 
 # init all CAs and generate initial CRLs
-.PHONY: init
-init: crls
-
-.PHONY: crls
-crls: pub/root-ca.crl pub/intermediate-ca.crl $(foreach ca,$(SIGNING_CA),pub/$(ca)-ca.crl)
+.PHONY: init crls
+init crls: $(foreach ca,$(ALL_CA),pub/$(ca)-ca.crl)
 
 # create crl for ca, runs when ca db is newer than crl
 pub/root-ca.crl: pub/root-ca-chain.p7c ca/db/root-ca.txt
