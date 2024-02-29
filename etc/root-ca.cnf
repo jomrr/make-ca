@@ -55,7 +55,7 @@ preserve                = no                    # Keep passed DN ordering
 name_opt                = $name_opt             # Subject DN display options
 cert_opt                = $cert_opt             # Certificate display options
 copy_extensions         = none                  # Copy extensions from CSR
-x509_extensions         = intermediate_ca_ext   # Default cert extensions
+x509_extensions         = ca_ext                # Default cert extensions
 default_crl_days        = 30                    # How long before next CRL
 crl_extensions          = crl_ext               # CRL extensions
 
@@ -69,15 +69,7 @@ commonName              = supplied
 
 # X509 Extensions
 
-[ root_ca_ext ]
-keyUsage                = critical,keyCertSign,cRLSign
-basicConstraints        = critical,CA:true
-subjectKeyIdentifier    = hash
-authorityKeyIdentifier  = keyid:always
-authorityInfoAccess     = @issuer_info
-crlDistributionPoints   = @crl_info
-
-[ intermediate_ca_ext ]
+[ ca_ext ]
 keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true
 subjectKeyIdentifier    = hash
