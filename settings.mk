@@ -39,10 +39,10 @@ export DEFAULT_BITS		?= 4096
 export DEFAULT_MD		?= sha3-256
 
 # CA Keys: param for openssl genpkey -algorithm $(CAK_ALG)
-#CAK_ALG					?= ED448
-CAK_ALG					?= RSA -pkeyopt rsa_keygen_bits:8192
+CAK_ALG					?= ED448
+#CAK_ALG					?= RSA -pkeyopt rsa_keygen_bits:8192
 
 # CRT Private Keys: param for openssl req -newkey $(KEY_ALG)
 # NOTE: ED25519 p12 client certificates still fail to import in Browsers
-#CPK_ALG					?= ED448
-CPK_ALG					?= RSA:$(DEFAULT_BITS)
+CPK_ALG					?= ED448
+#CPK_ALG					?= RSA:$(DEFAULT_BITS)
