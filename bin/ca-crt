@@ -42,17 +42,14 @@ get_config() {
 
 	if [[ "${ca}" == "root" ]]; then
 		echo -n "-config etc/root-ca.cnf "
-		echo -n "-extensions root_ca_ext "
 		echo -n "-passin file:ca/private/root-ca.pwd "
 		echo -n "-selfsign "
 	elif [[ "${ca}" == "intermediate" ]]; then
 		echo -n "-config etc/root-ca.cnf "
-		echo -n "-extensions intermediate_ca_ext "
 		echo -n "-keyfile ca/private/root-ca.key "
 		echo -n "-passin file:ca/private/root-ca.pwd "
 	else
 		echo -n "-config etc/intermediate-ca.cnf "
-		echo -n "-extensions signing_ca_ext "
 		echo -n "-keyfile ca/private/intermediate-ca.key "
 		echo -n "-passin file:ca/private/intermediate-ca.pwd "
 	fi

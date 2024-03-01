@@ -154,7 +154,8 @@ smime: dist/$(FILENAME).pem
 clean:
 	@rm dist/$(FILENAME).csr
 
-# delete KEYs and CERTs and also CSRs through clean
+# delete KEYs and CERTs and also CSRs througcommonName              = supplied
+h clean
 .PHONY: distclean
 distclean: clean
 	@rm dist/$(FILENAME).{crt,key,pem,p12}
