@@ -32,7 +32,7 @@ endef
 define revoke
 	/usr/bin/openssl ca -batch \
 		-config etc/$(2)-ca.cnf \
-		-revoke dist/$(1).crt \
+		-revoke dist/$(1).pem \
 		-passin file:ca/private/$(2)-ca.pwd \
 		-crl_reason $(3)
 endef
@@ -43,21 +43,24 @@ endef
 
 # keep these files
 .PRECIOUS: \
-	ca/certs/%-ca.crt \
+	ca/certs/%-ca.pem \
 	ca/db/%-ca.dat \
 	ca/db/%-ca.txt \
 	ca/db/%-ca.txt.attr \
-	ca/private/%-ca.key \
+	ca/private/%-ca.key.pem \
 	ca/private/%-ca.pwd \
-	ca/reqs/%-ca.csr \
+	ca/reqs/%-ca.csr.pem \
 	etc/%.cnf \
-	dist/%.csr \
-	dist/%.crt \
-	dist/%.key \
+	dist/%.csr.pem \
+	dist/%.der \
+	dist/%.pem \
+	dist/%.key.pem \
 	dist/%.p12 \
 	dist/%.pem \
+	dist/%.txt \
 	pub/%-ca.der \
 	pub/%-ca.pem \
+	pub/%-ca-chain.der \
 	pub/%-ca-chain.p7c \
 	pub/%-ca-chain.pem
 
@@ -70,15 +73,15 @@ help:
 	@bin/$@
 
 #create CSR and KEY, config is selected by calling target
-dist/%.csr:
+dist/%.csr.pem:
 	@/usr/bin/openssl req \
 		-new \
 		-newkey $(CPK_ALG) \
 		-config etc/$(MAKECMDGOALS).cnf \
-		-keyout dist/$*.key -out $@ -outform PEM
+		-keyout dist/$*.key.pem -out $@ -outform PEM
 
 #issue CRT by CA
-dist/%.crt: dist/%.csr
+dist/%.pem: dist/%.csr.pem
 	@/usr/bin/openssl ca \
 		-batch \
 		-notext \
@@ -90,18 +93,18 @@ dist/%.crt: dist/%.csr
 		-passin file:ca/private/$(CA)-ca.pwd
 
 #create pkcs12 bundle with key, crt and ca-chain
-dist/%.p12: dist/%.crt
+dist/%.p12: dist/%.pem
 	@/usr/bin/openssl pkcs12 \
 		-export \
 		-name "$*" \
-		-inkey dist/$*.key \
+		-inkey dist/$*.key.pem \
 		-in $< \
     	-certfile pub/$(CA)-ca-chain.pem \
 		-out $@
 
 #create pem bundle with crt and ca-chain
-dist/%.pem: dist/%.crt
-	@cat dist/$*.crt pub/$(CA)-ca-chain.pem > $@
+dist/%-fullchain.pem: dist/%.pem
+	@cat dist/$*.pem pub/$(CA)-ca-chain.pem > $@
 
 #create tls client certificate
 .PHONY: client
@@ -152,10 +155,9 @@ smime: dist/$(FILENAME).pem
 # delete CSRs
 .PHONY: clean
 clean:
-	@rm dist/$(FILENAME).csr
+	@rm dist/$(FILENAME).csr.pem
 
-# delete KEYs and CERTs and also CSRs througcommonName              = supplied
-h clean
+# delete KEYs and CERTs and also CSRs through clean
 .PHONY: distclean
 distclean: clean
 	@rm dist/$(FILENAME).{crt,key,pem,p12}
@@ -193,33 +195,33 @@ pub/%-ca.der: pub/%-ca.pem
 		-outform DER
 
 # export ca certificate in PEM format. it already should be.
-pub/%-ca.pem: ca/certs/%-ca.crt
+pub/%-ca.pem: ca/certs/%-ca.pem
 	@/usr/bin/openssl x509 \
-		-in ca/certs/$*-ca.crt \
+		-in ca/certs/$*-ca.pem \
 		-out pub/$*-ca.pem \
 		-outform PEM
 
 # issue ca certificate
-ca/certs/%-ca.crt: ca/reqs/%-ca.csr
+ca/certs/%-ca.pem: ca/reqs/%-ca.csr.pem
 	@bin/ca-crt --ca $*
 
 # additional dependency for Intermediate CA
-ca/certs/intermediate-ca.crt: ca/certs/root-ca.crt
+ca/certs/intermediate-ca.pem: ca/certs/root-ca.pem
 
 # additional dependency for Issuing CAs
-$(foreach ca,$(ISSUING_CA),ca/certs/$(ca)-ca.crt): ca/certs/intermediate-ca.crt
+$(foreach ca,$(ISSUING_CA),ca/certs/$(ca)-ca.pem): ca/certs/intermediate-ca.pem
 
 # create ca certificate signing request
-ca/reqs/%-ca.csr: ca/private/%-ca.key
+ca/reqs/%-ca.csr.pem: ca/private/%-ca.key.pem
 	@/usr/bin/openssl req \
 		-batch  \
 		-new \
 		-config etc/$*-ca.cnf \
 		-out $@ -outform PEM \
-		-key $< -passin file:$(patsubst %.key,%.pwd,$<)
+		-key $< -passin file:$(patsubst %.key.pem,%.pwd,$<)
 
 # create ca private key
-ca/private/%-ca.key: ca/private/%-ca.pwd
+ca/private/%-ca.key.pem: ca/private/%-ca.pwd
 	@/usr/bin/openssl genpkey \
 		-out $@ \
 		-algorithm $(CAK_ALG) \

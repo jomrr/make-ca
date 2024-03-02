@@ -40,11 +40,11 @@ subjectKeyIdentifier    = hash
 default_ca              = root_ca
 
 [ root_ca ]
-certificate             = $dir/certs/$ca.crt    # The CA cert
-private_key             = $dir/private/$ca.key  # CA private key
+certificate             = $dir/certs/$ca.pem    # The CA cert
+private_key             = $dir/private/$ca.key.pem  # CA private key
 new_certs_dir           = $dir/new              # Certificate archive
-serial                  = $dir/db/$ca.crt.srl   # Serial number file
-crlnumber               = $dir/db/$ca.crl.srl   # CRL number file
+serial                  = $dir/db/$ca.serial    # Serial number file
+crlnumber               = $dir/db/$ca.crlnumber # CRL number file
 database                = $dir/db/$ca.txt       # Index file
 unique_subject          = no                    # Require unique subject
 default_days            = 3652                  # How long to certify for

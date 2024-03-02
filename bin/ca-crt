@@ -46,15 +46,15 @@ get_config() {
 		echo -n "-selfsign "
 	elif [[ "${ca}" == "intermediate" ]]; then
 		echo -n "-config etc/root-ca.cnf "
-		echo -n "-keyfile ca/private/root-ca.key "
+		echo -n "-keyfile ca/private/root-ca.key.pem "
 		echo -n "-passin file:ca/private/root-ca.pwd "
 	else
 		echo -n "-config etc/intermediate-ca.cnf "
-		echo -n "-keyfile ca/private/intermediate-ca.key "
+		echo -n "-keyfile ca/private/intermediate-ca.key.pem "
 		echo -n "-passin file:ca/private/intermediate-ca.pwd "
 	fi
 
-	echo "-in ca/reqs/${ca}-ca.csr -out ca/certs/${ca}-ca.crt"
+	echo "-in ca/reqs/${ca}-ca.csr.pem -out ca/certs/${ca}-ca.pem"
 }
 
 main() {

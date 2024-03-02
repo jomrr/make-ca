@@ -45,11 +45,11 @@ prepare_ca() {
 	
     install -m 600 /dev/null ca/db/${ca}-ca.txt
 	install -m 600 /dev/null ca/db/${ca}-ca.txt.attr
-	install -m 600 /dev/null ca/db/${ca}-ca.crl.srl
+	install -m 600 /dev/null ca/db/${ca}-ca.crlnumber
 	
     date > ca/db/${ca}-ca.dat
     echo "unique_subject = no" > ca/db/${ca}-ca.txt.attr
-    echo 01 > ca/db/${ca}-ca.crl.srl
+    echo 01 > ca/db/${ca}-ca.crlnumber
 
     log_info "Finished creating directory structure ${ca}"
 }

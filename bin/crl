@@ -45,7 +45,7 @@ gen_crl() {
         -config "etc/${ca}-ca.cnf" \
         -passin "file:ca/private/${ca}-ca.pwd" \
         -out "pub/${ca}-ca.crl.pem"
-	openssl crl -in "pub/${ca}-ca.crl.pem" -out "pub/${ca}-ca.crl" -outform DER
+	openssl crl -in "pub/${ca}-ca.crl.pem" -out "pub/${ca}-ca.crl.der" -outform DER
 
     log_info "Generated CRL for ${ca}"
 }
