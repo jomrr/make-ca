@@ -41,7 +41,7 @@ default_ca              = root_ca
 
 [ root_ca ]
 certificate             = $dir/certs/$ca.pem    # The CA cert
-private_key             = $dir/private/$ca.key.pem  # CA private key
+private_key             = $dir/private/$ca.key  # CA private key
 new_certs_dir           = $dir/new              # Certificate archive
 serial                  = $dir/db/$ca.serial    # Serial number file
 crlnumber               = $dir/db/$ca.crlnumber # CRL number file
