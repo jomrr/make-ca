@@ -1,56 +1,16 @@
 # Makefile for operating a certificate authority
 
-# ******************************************************************************
-# configuration variables
-# ******************************************************************************
+# shell to use
 SHELL			:= bash
+# openssl binary
 OPENSSL			:= /usr/bin/openssl
+# destroy directories
+DESTROY			:= archive/ ca/ dist/ pub/
 
 # ca default settings
 include			settings.mk
-
-# list of CA slugs
-ROOT_CA			:= root-ca
-SIGNING_CA		:= intermediate-ca
-ISSUING_CA		:= component-ca identity-ca
-ALL_CA			:= $(ROOT_CA) $(SIGNING_CA) $(ISSUING_CA)
-
-# operational settings
-DATETIME		:= $(shell date +%Y-%m-%dT%H:%M:%S%z)
-CONFIG			:= $(shell find etc -mindepth 3 -maxdepth 3 -type f -name "*.cnf")
-CERTS			:= $(foreach cfg,$(CONFIG),$(subst .cnf,,$(subst etc/,certs/,$(cfg))))
-TARGET 			:= $(firstword $(MAKECMDGOALS))
-
-# Define a helper variable to check each pattern.
-HAS_CERTS 		:= $(findstring certs/,$(TARGET))
-HAS_RENEW 		:= $(findstring renew/,$(TARGET))
-HAS_REVOKE 		:= $(findstring revoke/,$(TARGET))
-
-# Check if first MAKECMDGOALS start with "{certs,renew,revoke}/"
-ifneq (,$(or $(HAS_CERTS),$(HAS_REVOKE),$(HAS_RENEW)))
-
-# Convert slashes to spaces to make it easier to extract individual parts
-SPACE_REPLACED_TARGET := $(subst /, ,$(TARGET))
-
-# Count the number of components in the TARGET
-NUM_COMPONENTS := $(words $(SPACE_REPLACED_TARGET))
-
-# Extract specific parts based on their position and the number of components
-CA := $(word 2, $(SPACE_REPLACED_TARGET))
-
-# static configuration
-ifeq ($(NUM_COMPONENTS),4)  # Implies format: etc/CA/CERT_TYPE/IDENTIFIER.cnf
-    CERT_TYPE := $(word 3, $(SPACE_REPLACED_TARGET))
-    IDENTIFIER_RAW := $(word 4, $(SPACE_REPLACED_TARGET))
-    IDENTIFIER := $(basename $(IDENTIFIER_RAW))  # Remove the .cnf extension
-# template configuration per extension
-else ifeq ($(NUM_COMPONENTS),3)  # Implies format: etc/CA/CERT_TYPE.cnf
-    CERT_TYPE := $(basename $(word 3, $(SPACE_REPLACED_TARGET)))
-    IDENTIFIER_RAW := $(word 3, $(SPACE_REPLACED_TARGET))
-    IDENTIFIER := $(CERT_TYPE)  # CERT_TYPE and IDENTIFIER are the same
-endif
-
-endif
+# variables for dynamic targets
+include 		targets.mk
 
 # delete files by CN
 define delete
@@ -67,12 +27,9 @@ define revoke
 		-crl_reason $(3)
 endef
 
-# ******************************************************************************
-# make settings
-# ******************************************************************************
-
 # keep these files
 .PRECIOUS: \
+	archive/%.tar.gz \
 	ca/certs/%.pem \
 	ca/db/%.crlnumber \
 	ca/db/%.serial \
@@ -86,6 +43,8 @@ endef
 	dist/%.key \
 	dist/%.p12 \
 	dist/%.pem \
+	dist/%-fullchain.pem \
+	dist/%.pwd \
 	dist/%.txt \
 	etc/%.cnf \
 	pub/%.der \
@@ -103,47 +62,40 @@ help:
 	echo "Usage: make [target] [CPK_ALG=algorithm]"
 	echo "       make certs/*  Create certificates from static conf"
 	echo "       make renew/*  Renew certificates from static conf"
-	echo "       make revoke/* [REASON=reason]\n"
+	echo "       make revoke/* [REASON=reason,default=superseded]\n"
 	echo "Static conf is provided by etc/<CA>/<CERT_TYPE>/<IDENTIFIER>.cnf"
 	echo "Default values are defined in settings.mk"
 
-#create CSR and KEY, config is selected by calling target
-dist/%.csr: | dist/
-	$(OPENSSL) req -new -newkey $(CPK_ALG) -config etc/$(CA)/$(CERT_TYPE)/$*.cnf -keyout dist/$*.key -out $@ -outform PEM
+.PHONY: all
+all: init
 
-#issue CRT by CA
-dist/%.pem: dist/%.csr
-	$(OPENSSL) ca -batch -notext -create_serial -config etc/$(CA).cnf -in $< -out $@ -extensions $(CERT_TYPE)_ext -passin file:ca/private/$(CA).pwd
+# delete CSRs in dist/
+.PHONY: clean
+clean:
+	@rm -f dist/*.csr
 
-#create pkcs12 bundle with key, crt and ca-chain
-dist/%.p12: dist/%.pem
-	$(OPENSSL) pkcs12 -export -name "$*" -inkey dist/$*.key -in $< -certfile pub/$(CA)-chain.pem -out $@
+# delete dist/
+.PHONY: distclean
+distclean:
+	@rm -rf dist/
 
-#create pem bundle with crt and ca-chain
-dist/%-fullchain.pem: dist/%.pem dist/%.csr
-	cat $< pub/$(CA)-chain.pem > $@
+# delete everything but make and the config dir
+.PHONY: destroy
+destroy:
+	@rm -Ir $(DESTROY)
 
-dist/%.der: dist/%-fullchain.pem dist/%.pem dist/%.csr
-	@$(OPENSSL) x509 -in dist/$*.pem -out $@ -outform DER
+# destroy everything without asking
+force-destroy:
+	@rm -rf $(DESTROY)
 
-dist/%.txt: dist/%.der dist/%-fullchain.pem dist/%.pem dist/%.csr
-	@$(OPENSSL) x509 -in dist/$*.pem -text -noout > $@
-
-.PHONY: $(CERTS)
-$(CERTS): certs/$(CA)/$(CERT_TYPE)/%: dist/%.txt dist/%.pem dist/%.csr
-	@echo "INFO: $@"
-	@ls -la dist/$*.*
-
-#create tls client certificate
-.PHONY: client
-client: CA=component-ca
-client: CPK_ALG=RSA:4096
-client: dist/$(FILENAME).p12
+# init all CAs and generate initial CRLs
+.PHONY: init crls
+init crls: $(foreach ca,$(ALL_CA),pub/$(ca).crl)
 
 # print CA db files with CA name for grepping serials, revoked, etc.
 .PHONY: print
 print:
-	for DB in ca/db/*.txt; do \
+	@for DB in ca/db/*.txt; do \
 		BASENAME=$$(basename "$$DB" .txt); \
 		CA_SLUG=$$(echo "$$BASENAME"); \
 		awk -v filename="$$CA_SLUG" '{ \
@@ -152,50 +104,73 @@ print:
 		}' "$$DB"; \
 	done
 
-# revoke CRT by CA and rebuild its CRL
-REVOKE_TARGETS := $(foreach ca,$(ISSUING_CA),revoke-$(ca))
+# create Private KEY
+dist/%.key: | dist/
+	@$(OPENSSL) genpkey -out $@ -algorithm $(CPK_ALG)
 
-.PHONY: $(REVOKE_TARGETS)
-$(REVOKE_TARGETS): revoke-%: $(ARCHPATH)
-	$(call revoke,$(FILENAME),$*,$(if $(REASON),$(REASON),superseded))
-	$(call delete,$(FILENAME))
-	$(MAKE) pub/$*.crl
+# create CSR, config is selected by calling target
+dist/%.csr: | dist/%.key dist/
+	@$(OPENSSL) req -batch -new -config etc/$(CA)/$(CERT_TYPE)/$*.cnf -key dist/$*.key -out $@ -outform PEM
 
-ca/archive/%.tar.gz: | ca/archive/
-	@tar -czvf $@ $(ARCHFILES)
+# issue PEM certificate from CSR
+dist/%.pem: dist/%.csr | dist/
+	@$(OPENSSL) ca -batch -notext -create_serial -config etc/$(CA).cnf -in $< -out $@ -extensions $(CERT_TYPE)_ext -passin file:ca/private/$(CA).pwd
 
-# create tls server certificate
-.PHONY: server
-server: CA=component-ca
-server: dist/$(FILENAME)-fullchain.pem
+# create pkcs12 bundle with key, crt and ca-chain
+dist/%.p12: dist/%.key dist/%.txt pub/$(CA)-chain.pem | dist/
+	@$(OPENSSL) pkcs12 -export -name "$*" -inkey $< -in dist/$*.pem -certfile pub/$(CA)-chain.pem -out $@
 
-# create certificate with smime extensions
-.PHONY: smime
-smime: CA=identity-ca
-smime: dist/$(FILENAME).pem
+# create pem bundle with crt and ca-chain
+dist/%-fullchain.pem: dist/%.pem dist/%.csr
+	@cat $< pub/$(CA)-chain.pem > $@
 
-# delete CSRs
-.PHONY: clean
-clean:
-	@rm dist/$(FILENAME).csr
+# export certificate in DER format
+dist/%.der: dist/%-fullchain.pem dist/%.pem dist/%.csr
+	@$(OPENSSL) x509 -in dist/$*.pem -out $@ -outform DER
 
-# delete KEYs and CERTs and also CSRs through clean
-.PHONY: distclean
-distclean: clean
-	@rm dist/$(FILENAME).{crt,der,key,pem,p12,txt}
+# export certificate in txt format
+dist/%.txt: dist/%.der dist/%-fullchain.pem dist/%.pem dist/%.csr
+	@$(OPENSSL) x509 -in dist/$*.pem -text -noout > $@
 
-# delete everything but make and the config dir
-.PHONY: destroy
-destroy:
-	@rm -Ir ./ca/ ./dist/ ./pub/
+# dynamic target for certificate generation
+.PHONY: $(CERTS)
+$(CERTS): certs/$(CA)/$(CERT_TYPE)/%: dist/%.txt dist/%.pem dist/%.csr
+	@echo "CERT: $@"
+	@ls -la dist/$*.*
 
-# destroy everything without asking
-force-destroy:
-	@rm -rf ./ca/ ./dist/ ./pub/
+# dynamic target for p12 bundle generation
+.PHONY: $(P12S)
+$(P12S): p12/$(CA)/$(CERT_TYPE)/%: dist/%.p12
+	@echo "P12: $@"
+	@ls -la dist/$*.p12
 
-# init all CAs and generate initial CRLs
-.PHONY: init crls
-init crls: $(foreach ca,$(ALL_CA),pub/$(ca).crl)
+# dynamic target for certificate renewal
+.PHONY: $(RENEWS)
+$(RENEWS): renew/$(CA)/$(CERT_TYPE)/%: renew-% dist/%.txt pub/$(CA).crl
+	@echo "RENEW: $@"
+	@ls -la dist/$*.*
+
+# dynamic target for certificate revocation
+.PHONY: $(REVOKES)
+$(REVOKES): revoke/$(CA)/$(CERT_TYPE)/%: revoke-% pub/$(CA).crl
+	@echo "REVOKE: $@"
+	@ls -la archive/$*.*
+
+# renew a certificate with existing key
+.PHONY: renew-%
+renew-%: archive/%.tar.gz
+	@$(OPENSSL) ca -batch -config etc/$(CA).cnf -revoke dist/$*.pem -passin file:ca/private/$(CA).pwd -crl_reason superseded
+	@rm -f dist/$**.{csr,der,pem,p12,txt}
+
+# revoke a certificate
+.PHONY: revoke-%
+revoke-%: archive/%.tar.gz
+	@$(OPENSSL) ca -batch -config etc/$(CA).cnf -revoke dist/$*.pem -passin file:ca/private/$(CA).pwd -crl_reason $(REASON)
+	@rm -f dist/$**.*
+
+# create archive of certificate artifacts
+archive/%.tar.gz: | archive/
+	@tar -czvf "archive/$*.$(DATETIME).tar.gz" dist/$*.*
 
 # generate CRL for CAs and initialize if needed
 pub/%.crl: pub/%-chain.der ca/db/%.txt | ca/db/%.crlnumber pub/
@@ -261,23 +236,16 @@ ca/db/%.txt.attr: | ca/db/
 ca/private/%.pwd: | ca/private/
 	@$(OPENSSL) rand -hex 64 > $@
 
-ca/archive/ ca/db/ ca/new/ ca/private/ ca/reqs/: | ca/
+archive/ ca/db/ ca/new/ ca/private/ ca/reqs/: | ca/
 	@mkdir -m 700 -p $@
 
 ca/ ca/certs/ dist/ pub/ dist/$(CA)/$(CERT_TYPE)/:
 	@mkdir -m 755 -p $@
 
-# test all targets
+# basic smoke test
 .PHONY: test
 test:
 	$(MAKE) force-destroy 1>/dev/null
 	CAK_ALG=ED25519 $(MAKE) init 1>/dev/null
-	CPK_ALG=ED25519 $(MAKE) server CN=test.example.com SAN=DNS:www.example.com 1>/dev/null
-	CPK_ALG=ED25519 $(MAKE) fritzbox 1>/dev/null
-	CPK_ALG=ED25519 $(MAKE) revoke-component-ca CN=test.example.com 1>/dev/null
-	CPK_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="test@example.com" 1>/dev/null
-
-# catch all unkown targets and inform
-# %:
-# 	echo "INFO: omitting unknown target:\t%s\n" $ 1>&2
-# 	:
+	CPK_ALG=ED25519 $(MAKE) certs/compontent-ca/server/fritzbox 1>/dev/null
+	CPK_ALG=ED25519 $(MAKE) revoke/component-ca/server/fritzbox 1>/dev/null

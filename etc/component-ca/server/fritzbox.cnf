@@ -27,7 +27,7 @@ subjectKeyIdentifier    = hash
 subjectAltName          = @fritzbox_san
 
 [ fritzbox_san ]
-DNS.0                   = wsroikgniugb7373e4t4.myfritz.net
+DNS.0                   = ${CN}
 DNS.1                   = fritz.box
 DNS.2                   = www.fritz.box
 DNS.3                   = myfritz.box
