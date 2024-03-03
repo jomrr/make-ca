@@ -12,21 +12,6 @@ include			settings.mk
 # variables for dynamic targets
 include 		targets.mk
 
-# delete files by CN
-define delete
-	find dist -type f -regextype posix-extended \
-		-regex ".*/$(1).*\.[^\.]+" -exec rm -f {} +
-endef
-
-# revoke a certificate by CN, CA and REASON
-define revoke
-	$(OPENSSL) ca -batch \
-		-config etc/$(2).cnf \
-		-revoke dist/$(1).pem \
-		-passin file:ca/private/$(2).pwd \
-		-crl_reason $(3)
-endef
-
 # keep these files
 .PRECIOUS: \
 	archive/%.tar.gz \
@@ -249,3 +234,4 @@ test:
 	CAK_ALG=ED25519 $(MAKE) init 1>/dev/null
 	CPK_ALG=ED25519 $(MAKE) certs/compontent-ca/server/fritzbox 1>/dev/null
 	CPK_ALG=ED25519 $(MAKE) revoke/component-ca/server/fritzbox 1>/dev/null
+	CAK_ALG=ED25519 $(MAKE) crls 1>/dev/null
