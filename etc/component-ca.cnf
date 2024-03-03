@@ -77,14 +77,6 @@ authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @ocsp_info
 crlDistributionPoints   = @crl_info
 
-[ fritzbox_ext ]
-keyUsage                = critical,digitalSignature,keyEncipherment
-extendedKeyUsage        = clientAuth,serverAuth
-subjectKeyIdentifier    = hash
-authorityKeyIdentifier  = keyid:always
-authorityInfoAccess     = @ocsp_info
-crlDistributionPoints   = @crl_info
-
 [ ocsp_ext ]
 keyUsage                = critical,digitalSignature
 extendedKeyUsage        = critical,OCSPSigning
