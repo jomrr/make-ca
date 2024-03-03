@@ -108,7 +108,7 @@ dist/%.p12: dist/%.pem
 
 #create pem bundle with crt and ca-chain
 dist/%-fullchain.pem: dist/%.pem
-	cat dist/$*.pem pub/$(CA)-chain.pem > $
+	cat dist/$*.pem pub/$(CA)-chain.pem > $@
 
 #create tls client certificate
 .PHONY: client
@@ -119,7 +119,7 @@ client: dist/$(FILENAME).p12
 # create tls certificate for fritzbox
 .PHONY: fritzbox
 fritzbox: CA=component-ca
-fritzbox: dist/$(FRITZBOX_PUBLIC).myfritz.net.pem
+fritzbox: dist/$(FRITZBOX_PUBLIC).myfritz.net-fullchain.pem
 
 # print CA db files with CA name for grepping serials, revoked, etc.
 .PHONY: print
@@ -149,12 +149,12 @@ ca/archive/%.tar.gz:
 # create tls server certificate
 .PHONY: server
 server: CA=component-ca
-server: dist/$(FILENAME).pem
+server: dist/$(FILENAME)-fullchain.pem
 
 # create certificate with smime extensions
 .PHONY: smime
 smime: CA=identity-ca
-smime: dist/$(FILENAME).pem
+smime: dist/$(FILENAME)-fullchain.pem
 
 # delete CSRs
 .PHONY: clean
