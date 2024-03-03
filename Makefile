@@ -22,7 +22,7 @@ DATETIME		:= $(shell date +%Y-%m-%dT%H:%M:%S%z)
 # delete files by CN
 define delete
 	find dist -type f -regextype posix-extended \
-		-regex ".*/$(1)\.[^\.]+" -exec rm -f {} +
+		-regex ".*/$(1).*\.[^\.]+" -exec rm -f {} +
 endef
 
 # revoke a certificate by CN, CA and REASON
@@ -40,27 +40,25 @@ endef
 
 # keep these files
 .PRECIOUS: \
-	ca/certs/%.der \
 	ca/certs/%.pem \
-	ca/certs/%.txt \
-	ca/db/%.dat \
+	ca/db/%.crlnumber \
+	ca/db/%.serial \
 	ca/db/%.txt \
 	ca/db/%.txt.attr \
 	ca/private/%.key \
 	ca/private/%.pwd \
 	ca/reqs/%.csr \
-	etc/%.cnf \
 	dist/%.csr \
 	dist/%.der \
-	dist/%.pem \
 	dist/%.key \
 	dist/%.p12 \
 	dist/%.pem \
 	dist/%.txt \
+	etc/%.cnf \
 	pub/%.der \
 	pub/%.pem \
+	pub/%.txt \
 	pub/%-chain.der \
-	pub/%-chain.p7c \
 	pub/%-chain.pem
 
 # ******************************************************************************
@@ -69,7 +67,7 @@ endef
 
 .PHONY: help
 help:
-	echo "Usage: make [target] [KEY_ALG=algorithm]"
+	echo "Usage: make [target] [CPK_ALG=algorithm]"
 	echo "       make client   [CN=name]"
 	echo "       make server   [CN=name] [SAN=DNS:othername[,..]]"
 	echo "       make smime    [CN=name] [EMAIL=address] [SAN=email:mail[,..]]"
@@ -126,10 +124,10 @@ fritzbox: dist/$(FRITZBOX_PUBLIC).myfritz.net-fullchain.pem
 print:
 	for DB in ca/db/*.txt; do \
 		BASENAME=$$(basename "$$DB" .txt); \
-		CA_SLUG=$$(echo "$$BASENAME" | cut -d '-' -f1); \
+		CA_SLUG=$$(echo "$$BASENAME"); \
 		awk -v filename="$$CA_SLUG" '{ \
 			gsub(/[ \t]+/, " "); \
-			printf "%-12s: %s\n", filename, $$0; \
+			printf "%s %s\n", filename, $$0; \
 		}' "$$DB"; \
 	done
 
@@ -142,9 +140,8 @@ $(REVOKE_TARGETS): revoke-%: $(ARCHPATH)
 	$(call delete,$(FILENAME))
 	$(MAKE) pub/$*.crl
 
-ca/archive/%.tar.gz:
-	mkdir -m 700 -p ca/archive
-	tar -czvf $(ARCHPATH) $(ARCHFILES)
+ca/archive/%.tar.gz: | ca/archive/
+	tar -czvf $@ $(ARCHFILES)
 
 # create tls server certificate
 .PHONY: server
@@ -154,7 +151,7 @@ server: dist/$(FILENAME)-fullchain.pem
 # create certificate with smime extensions
 .PHONY: smime
 smime: CA=identity-ca
-smime: dist/$(FILENAME)-fullchain.pem
+smime: dist/$(FILENAME).pem
 
 # delete CSRs
 .PHONY: clean
@@ -180,20 +177,25 @@ force-destroy:
 init crls: $(foreach ca,$(ALL_CA),pub/$(ca).crl)
 
 # generate CRL for CAs and initialize if needed
-pub/%.crl: pub/%-chain.pem ca/db/%.txt | ca/db/%.crlnumber pub/
-	openssl ca -gencrl -config etc/$*.cnf -passin file:ca/private/$*.pwd -out pub/$*.crl.pem
-	openssl crl -in "pub/$*.crl.pem" -out $@ -outform DER
-	rm -f pub/$*.crl.pem
+pub/%.crl: pub/%-chain.der ca/db/%.txt | ca/db/%.crlnumber pub/
+	$(OPENSSL) ca -gencrl -config etc/$*.cnf -passin file:ca/private/$*.pwd -out pub/$*.crl.pem
+	$(OPENSSL) crl -in "pub/$*.crl.pem" -out $@ -outform DER
 
-pub/root-ca-chain.pem: pub/%-chain.pem: pub/%.pem | pub/
+pub/%-chain.der: pub/%-chain.pem | pub/
+	$(OPENSSL) x509 -in $< -out $@ -outform DER
+
+pub/root-ca-chain.pem: pub/%-chain.pem: pub/%.txt | pub/
 	cat pub/root-ca.pem > $@
 
-pub/intermediate-ca-chain.pem: pub/%-chain.pem: pub/%.pem | pub/
+pub/intermediate-ca-chain.pem: pub/%-chain.pem: pub/%.pem pub/%.txt | pub/
 	cat $< pub/root-ca.pem > $@
 
 # create PEM certificate chain for issuing ca
-pub/%-chain.pem: pub/%.pem | pub/
+pub/%-chain.pem: pub/%.pem pub/%.txt | pub/
 	cat $< pub/intermediate-ca.pem pub/root-ca.pem > $@
+
+pub/%.txt: pub/%.der | pub/
+	$(OPENSSL) x509 -in $< -text -noout > $@
 
 # create DER export of ca certificate
 pub/%.der: pub/%.pem | pub/
@@ -203,15 +205,15 @@ pub/%.der: pub/%.pem | pub/
 pub/%.pem: ca/certs/%.pem | pub/
 	$(OPENSSL) x509 -in $< -out $@ -outform PEM
 
-# issue root ca certificate
+# generate root ca certificate
 ca/certs/root-ca.pem: ca/certs/%.pem: ca/reqs/%.csr | ca/db/%.txt ca/certs/ ca/new/
 	$(OPENSSL) ca -batch -notext -create_serial -config etc/$*.cnf -passin file:ca/private/$*.pwd -selfsign -in $< -out $@
 
-# issue intermediate ca certificate
+# generate intermediate ca certificate
 ca/certs/intermediate-ca.pem: ca/certs/%.pem: ca/reqs/%.csr ca/certs/root-ca.pem | ca/db/%.txt ca/certs/ ca/new/
 	$(OPENSSL) ca -batch -notext -create_serial -config etc/root-ca.cnf -keyfile ca/private/root-ca.key -passin file:ca/private/root-ca.pwd -in $< -out $@
 
-# issue ca certificate
+# generate issuing ca certificates
 ca/certs/%.pem: ca/reqs/%.csr ca/certs/intermediate-ca.pem | ca/db/%.txt ca/certs/ ca/new/
 	$(OPENSSL) ca -batch -notext -create_serial -config etc/intermediate-ca.cnf -keyfile ca/private/intermediate-ca.key -passin file:ca/private/intermediate-ca.pwd -in $< -out $@
 
@@ -248,11 +250,11 @@ ca/ ca/certs/ dist/ pub/:
 .PHONY: test
 test:
 	$(MAKE) force-destroy 1>/dev/null
-	CAK_ALG=ED25519 $(MAKE) init
+	CAK_ALG=ED25519 $(MAKE) init 1>/dev/null
 	CPK_ALG=ED25519 $(MAKE) server CN=test.example.com SAN=DNS:www.example.com 1>/dev/null
 	CPK_ALG=ED25519 $(MAKE) fritzbox 1>/dev/null
 	CPK_ALG=ED25519 $(MAKE) revoke-component-ca CN=test.example.com 1>/dev/null
-	CPK_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="testexample.com" 1>/dev/null
+	CPK_ALG=ED25519 $(MAKE) smime CN="test user" EMAIL="test@example.com" 1>/dev/null
 
 # catch all unkown targets and inform
 # %:
