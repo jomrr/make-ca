@@ -10,23 +10,26 @@ Makefile for creating and managing a 3-tier certificate authority.
 
 ## Getting started
 
-The `make-ca` project is a Makefile-based tool for creating and managing a 3-tier certificate authority. It provides a simple and automated way to generate and manage certificates for various purposes.
+The `make-ca` project is a Makefile-based tool for creating and managing a 3-tier certificate authority. It provides a simple and automated way to generate and manage Certificates amd CRLs for various purposes.
+The directory structure is simplified for a centralized use case, where one operator manages the CAs.
 
 ### Directory Structure
 
 | level 0 | level 1 | level 2 | description |
 | ------- | ------- | ------- | ----------- |
-| **name** | | | base dir of the ca, e.g. example for Example CA |
+| **name** | | | base dir of the ca, e.g. `example` for Example CA |
+| | archive | | renewed and revoked certificates are archived here by ID and timestamp |
 | | ca | | CA specific data |
-| | | archive | revoked certificates are archived here |
 | | | certs | CA certificates go here |
 | | | db | CA database and serial files are located here |
 | | | new | new issued certificates named by serial no. |
 | | | private | private keys of CAs |
 | | | reqs | CSRs of the CA certificates |
 | | dist  | | issued certificates and keys from signing CAs |
-| | etc | | openssl configuration files |
-| | www | | web distribution folder with CA certs, CRLs |
+| | etc | | openssl configuration files for CAs |
+| | | component-ca | template cnf extension subfolders for Component CA |
+| | | identity-ca | template cnf and extension subfolders for Identity CA |
+| | pub | | public/web distribution folder with CA certs, chains, CRLs |
 
 The following headlines describe the CA structure.
 
@@ -64,8 +67,9 @@ The Component CA (a Signing CA), configured in `etc/component-ca.cnf`.
 Issues:
 
 - `client`: TLS Client certificates
-- `fritzbox`: TLS Server certificates for AVM Router with all default SANs
 - `server`: TLS Server certificates
+- `ocsp`: OCSP siging
+- `timestamp` Timestamping signing
 - Component CA CRL
 
 ## Installation
@@ -84,21 +88,26 @@ Here are a few examples how to use `make-ca`.
 ### Create TLS Server certificate with subjectAltNames
 
 ```bash
-make client CN=server01.example.com SAN=="DNS:server01.example.com,DNS:www.example.com,IP:10.12.10.11"
+# copy template etc/<CA>/<CERT_TYPE/X509 Extension>/<ID>.cnf
+cp etc/component-ca/server.cnf etc/component-ca/server/test.example.com.cnf
+# customize CSR data
+nvim etc/component-ca/server/test.example.com.cnf
+# issue certificate
+make certs/component-ca/server/test.example.com
 ```
 
 ### Revoke TLS Server certificate
 
-Use the CA specific target to revoke, in this case `make rev-component`.
+Use the CA specific target to revoke, in this case `make revoke/*`.
 
 ```bash
-make rev-component CN=server01.example.com REASON=superseded
+make revoke/component-ca/server/test.example.com REASON=superseded
 ```
 
 ### Create Ed25519 TLS Server certificate
 
 ```bash
-KEY_ALG=ED25519 make server CN=test.example.com
+CPK_ALG=ED25519 make certs/component-ca/server/test.example.com
 
 # example output:
 Signature ok
@@ -136,20 +145,6 @@ Certificate is to be certified until Feb 23 21:25:10 2026 GMT (730 days)
 
 Write out database with 1 new entries
 Data Base Updated
-```
-
-### Create S/MIME certificate
-
-```bash
-make smime CN="John Doe" EMAIL="john.doe@example.com"
-```
-
-### Revoke S/MIME certificate
-
-Use the CA specific target to revoke, in this case `make rev-identity`.
-
-```bash
-make rev-identity EMAIL="john.doe@example.com"
 ```
 
 ## License
