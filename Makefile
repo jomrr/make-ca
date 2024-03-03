@@ -18,9 +18,6 @@ ALL_CA			:= $(ROOT_CA) $(SIGNING_CA) $(ISSUING_CA)
 # operational settings
 FILENAME		?= $(if $(EMAIL),$(EMAIL),$(CN))
 DATETIME		:= $(shell date +%Y-%m-%dT%H:%M:%S%z)
-ARCHPATH		:= ca/archive/$(FILENAME)-$(DATETIME).tar.gz
-ARCHFILES		:= $(shell find dist -type f -regextype posix-extended \
-		-regex ".*/$(FILENAME)\.[^\.]+$$")
 
 # delete files by CN
 define delete
@@ -30,7 +27,7 @@ endef
 
 # revoke a certificate by CN, CA and REASON
 define revoke
-	/usr/bin/openssl ca -batch \
+	$(OPENSSL) ca -batch \
 		-config etc/$(2)-ca.cnf \
 		-revoke dist/$(1).pem \
 		-passin file:ca/private/$(2)-ca.pwd \
@@ -70,11 +67,17 @@ endef
 
 .PHONY: help
 help:
-	@bin/$@
+	@printf "Usage: make [target] [KEY_ALG=algorithm]\n"
+	@printf "       make client   [CN=name]\n"
+	@printf "       make server   [CN=name] [SAN=DNS:othername[,..]]\n"
+	@printf "       make smime    [CN=name] [EMAIL=address] [SAN=email:mail[,..]]\n"
+	@printf "       make revoke   [CA=slug] [CN=name] [REASON=reason]\n"
+	@printf "\n"
+	@printf "Default values are defined in settings.mk\n"
 
 #create CSR and KEY, config is selected by calling target
 dist/%.csr.pem:
-	@/usr/bin/openssl req \
+	@$(OPENSSL) req \
 		-new \
 		-newkey $(CPK_ALG) \
 		-config etc/$(MAKECMDGOALS).cnf \
@@ -82,7 +85,7 @@ dist/%.csr.pem:
 
 #issue CRT by CA
 dist/%.pem: dist/%.csr.pem
-	@/usr/bin/openssl ca \
+	@$(OPENSSL) ca \
 		-batch \
 		-notext \
 		-create_serial \
@@ -94,7 +97,7 @@ dist/%.pem: dist/%.csr.pem
 
 #create pkcs12 bundle with key, crt and ca-chain
 dist/%.p12: dist/%.pem
-	@/usr/bin/openssl pkcs12 \
+	@$(OPENSSL) pkcs12 \
 		-export \
 		-name "$*" \
 		-inkey dist/$*.key.pem \
@@ -173,47 +176,47 @@ force-destroy:
 
 # init all CAs and generate initial CRLs
 .PHONY: init crls
-init crls: $(foreach ca,$(ALL_CA),pub/$(ca)-ca.crl)
+init crls: $(foreach ca,$(ALL_CA),pub/$(ca)-ca.crl.der)
 
 # generate CRL for CAs and initialize if needed
-pub/%-ca.crl: pub/%-ca-chain.p7c ca/db/%-ca.txt
+pub/%-ca.crl.der: pub/%-ca-chain.p7c ca/db/%-ca.txt | pub/
 	@bin/crl --ca $*
 
 # create PKCS7 certificate chain for ca
-pub/%-ca-chain.p7c: pub/%-ca-chain.pem
+pub/%-ca-chain.p7c: pub/%-ca-chain.pem | pub
 	@bin/chain --ca $* --format p7c
 
-# create PEM certificate chain for ca
-pub/%-ca-chain.pem: pub/%-ca.der
-	@bin/chain --ca $* --format pem
+# create PEM certificate chain for issuing ca
+pub/%-ca-chain.pem: pub/%-ca.pem | pub
+	@cat $< pub/intermediate-ca.pem pub/root-ca.pem > $@
+
+pub/intermediate-ca-chain.pem: pub/intermediate-ca.pem | pub
+	@cat $< pub/root-ca.pem > $@
+
+pub/root-ca-chain.pem: pub/root-ca.pem | pub
+	@cat $< > $@
 
 # create DER export of ca certificate
-pub/%-ca.der: pub/%-ca.pem
-	@/usr/bin/openssl x509 \
-		-in pub/$*-ca.pem \
-		-out pub/$*-ca.der \
-		-outform DER
+pub/%-ca.der: pub/%-ca.pem | pub
+	@$(OPENSSL) x509 -in $< -out $@ -outform DER
 
 # export ca certificate in PEM format. it already should be.
-pub/%-ca.pem: ca/certs/%-ca.pem
-	@/usr/bin/openssl x509 \
-		-in ca/certs/$*-ca.pem \
-		-out pub/$*-ca.pem \
-		-outform PEM
+pub/%-ca.pem: ca/certs/%-ca.pem | pub/
+	@$(OPENSSL) x509 -in $< -out $@ -outform PEM
 
 # issue ca certificate
-ca/certs/%-ca.pem: ca/reqs/%-ca.csr.pem
+ca/certs/%-ca.pem: ca/reqs/%-ca.csr.pem | ca/certs/ ca/new/
 	@bin/ca-crt --ca $*
 
 # additional dependency for Intermediate CA
-ca/certs/intermediate-ca.pem: ca/certs/root-ca.pem
+ca/certs/intermediate-ca.pem: ca/certs/root-ca.pem | ca/certs
 
 # additional dependency for Issuing CAs
-$(foreach ca,$(ISSUING_CA),ca/certs/$(ca)-ca.pem): ca/certs/intermediate-ca.pem
+$(foreach ca,$(ISSUING_CA),ca/certs/$(ca)-ca.pem): ca/certs/intermediate-ca.pem | ca/certs
 
 # create ca certificate signing request
-ca/reqs/%-ca.csr.pem: ca/private/%-ca.key.pem
-	@/usr/bin/openssl req \
+ca/reqs/%-ca.csr.pem: ca/private/%-ca.key.pem | ca/reqs
+	@$(OPENSSL) req \
 		-batch  \
 		-new \
 		-config etc/$*-ca.cnf \
@@ -222,18 +225,27 @@ ca/reqs/%-ca.csr.pem: ca/private/%-ca.key.pem
 
 # create ca private key
 ca/private/%-ca.key.pem: ca/private/%-ca.pwd
-	@/usr/bin/openssl genpkey \
+	@$(OPENSSL) genpkey \
 		-out $@ \
 		-algorithm $(CAK_ALG) \
 		-aes256 -pass file:$<
 
-# create password for encrypted private keys
-ca/private/%-ca.pwd: ca/db/%-ca.dat
-	@/usr/bin/openssl rand -base64 64 > $@
+ca/db/%-ca.txt: | ca/db ca/db/%-ca.txt.attr
+	@install -m 600 /dev/null $@
 
-# create ca db file and structure
-ca/db/%-ca.dat ca/db/%-ca.txt:
-	@test -f $@ || bin/prepare --ca $*
+ca/db/%-ca.txt.attr: | ca/db
+	@install -m 600 /dev/null $@
+	@echo "unique_subject = no" > $@
+
+# create password for encrypted private keys
+ca/private/%-ca.pwd: | ca/private
+	@$(OPENSSL) rand -base64 64 > $@
+
+ca/archive ca/db ca/new ca/private ca/reqs: | ca/
+	@mkdir -m 700 -p $@
+
+ca/ ca/certs dist/ pub/:
+	@mkdir -m 755 -p $@
 
 # test all targets
 .PHONY: test
