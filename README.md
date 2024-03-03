@@ -48,8 +48,8 @@ The Intermedite CA of the 3-tier setup, configured in `etc/intermediate-ca.cnf`.
 
 Issues:
 
-- Signing CA certificates
-- Intermediate CA CRL
+- Signing CA certificates (`pub/*[-chain].{der,pem,txt}`)
+- Intermediate CA CRL (`pub/intermediate-ca.{crl,crl.pem}`)
 
 ##### Identity CA
 
@@ -57,8 +57,8 @@ The Identity CA (a Signing CA), configured in `etc/identity-ca.cnf`.
 
 Issues:
 
-- `smime`: S/MIME Certificates for mail signature end encryption
-- Identity CA CRL
+- `smime`: S/MIME Certificates for mail signature end encryption (`dist/*[-fullchain].{der,pem,txt}`)
+- Identity CA CRL (`pub/identity-ca.{crl,crl.pem}`)
 
 ##### Component CA
 
@@ -66,11 +66,11 @@ The Component CA (a Signing CA), configured in `etc/component-ca.cnf`.
 
 Issues:
 
-- `client`: TLS Client certificates
-- `server`: TLS Server certificates
+- `client`: TLS Client certificates (`dist/*[-fullchain].{der,pem,txt}`)
+- `server`: TLS Server certificates (`dist/*[-fullchain].{der,pem,txt}`)
 - `ocsp`: OCSP siging
-- `timestamp` Timestamping signing
-- Component CA CRL
+- `timestamp` Timestamp signing
+- Component CA CRL  (`pub/component-ca.{crl,crl.pem}`)
 
 ## Installation
 
