@@ -232,6 +232,4 @@ ca/ ca/certs/ dist/ pub/ dist/$(CA)/$(CERT_TYPE)/:
 test:
 	$(MAKE) force-destroy 1>/dev/null
 	CAK_ALG=ED25519 $(MAKE) init 1>/dev/null
-	CPK_ALG=ED25519 $(MAKE) certs/compontent-ca/server/fritzbox 1>/dev/null
-	CPK_ALG=ED25519 $(MAKE) revoke/component-ca/server/fritzbox 1>/dev/null
 	CAK_ALG=ED25519 $(MAKE) crls 1>/dev/null
