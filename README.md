@@ -1,6 +1,6 @@
 # make-ca
 
-![GitHub License](https://img.shields.io/github/license/jam82/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjam82%2Fmake-ca%2Fblob%2Fmain%2FLICENSE) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/jam82/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjam82%2Fmake-ca%2Fissues)
+![GitHub License](https://img.shields.io/github/license/jomrr/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjomrr%2Fmake-ca%2Fblob%2Fmain%2FLICENSE) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/jomrr/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjomrr%2Fmake-ca%2Fissues)
 
 Makefile for creating and managing a 3-tier certificate authority.
 
@@ -76,7 +76,7 @@ Issues:
 
 To install `make-ca`, follow these steps:
 
-1. Clone the repository: `git clone https://github.com/jam82/make-ca.git /etc/pki/tls/ca/<your name>`
+1. Clone the repository: `git clone https://github.com/jomrr/make-ca.git /etc/pki/tls/ca/<your name>`
 2. Change into the project directory: `cd /etc/pki/tls/ca/<your name>`
 3. Customize `settings.mk` to your needs
 4. Initialize the CAs wit the command: `make init`
@@ -149,8 +149,8 @@ Data Base Updated
 
 ## License
 
-This project is licensed under the [MIT License](https://github.com/jam82/make-ca/blob/main/LICENSE).
+This project is licensed under the [MIT License](https://github.com/jomrr/make-ca/blob/main/LICENSE).
 
 ## Author(s)
 
-- @jam82 (2022)
+- @jomrr (2022)
