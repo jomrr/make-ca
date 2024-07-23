@@ -26,3 +26,4 @@ keyUsage                = critical,nonRepudiation,digitalSignature,keyEncipherme
 extendedKeyUsage        = emailProtection
 subjectKeyIdentifier    = hash
 subjectAltName          = ${ENV::SAN}
+tlsfeature              = status_request

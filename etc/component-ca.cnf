@@ -33,6 +33,7 @@ commonName              = ${ENV::DN_O} Component CA
 keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true,pathlen:0
 subjectKeyIdentifier    = hash
+tlsfeature              = status_request
 
 # CA operational settings
 

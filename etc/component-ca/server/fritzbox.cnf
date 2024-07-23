@@ -25,6 +25,7 @@ keyUsage                = critical,digitalSignature,keyEncipherment
 extendedKeyUsage        = clientAuth,serverAuth
 subjectKeyIdentifier    = hash
 subjectAltName          = @fritzbox_san
+tlsfeature              = status_request
 
 [ fritzbox_san ]
 DNS.0                   = ${CN}
