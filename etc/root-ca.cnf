@@ -33,7 +33,6 @@ commonName              = ${ENV::DN_O} Root CA
 keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true
 subjectKeyIdentifier    = hash
-tlsfeature              = status_request
 
 # CA operational settings
 
