@@ -233,3 +233,7 @@ test:
 	$(MAKE) force-destroy 1>/dev/null
 	CAK_ALG=ED25519 $(MAKE) init 1>/dev/null
 	CAK_ALG=ED25519 $(MAKE) crls 1>/dev/null
+	$(MAKE) certs/component-ca/server/fritzbox 1>/dev/null
+	$(MAKE) revoke/component-ca/server/fritzbox REASON=superseded 1>/dev/null
+	$(MAKE) crls 1>/dev/null
+	$(MAKE) force-destroy 1>/dev/null
