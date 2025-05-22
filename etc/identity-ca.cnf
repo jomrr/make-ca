@@ -2,7 +2,6 @@
 ca                      = identity-ca           # Current CA name
 dir                     = ca                    # Top dir
 base_url                = ${ENV::BASE_URL}      # CA base URL
-ocsp_url                = ${ENV::OCSP_URL}      # CA OCSP URL
 aia_url                 = $base_url/$ca.der     # CA certificate URL
 crl_url                 = $base_url/$ca.crl     # CRL distribution point
 name_opt                = ca_default            # Subject name display option
@@ -75,7 +74,7 @@ keyUsage                = critical,nonRepudiation,digitalSignature
 extendedKeyUsage        = emailProtection
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
-authorityInfoAccess     = @ocsp_info
+authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
 [ smartcard_ext ]
@@ -83,7 +82,7 @@ keyUsage                = critical,nonRepudiation,digitalSignature,keyEncipherme
 extendedKeyUsage        = clientAuth,codeSigning,emailProtection,msEFS,msSmartcardLogin
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
-authorityInfoAccess     = @ocsp_info
+authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
 [ crl_ext ]
@@ -95,7 +94,3 @@ URI.0                   = $crl_url
 
 [ issuer_info ]
 caIssuers;URI.0         = $aia_url
-
-[ ocsp_info ]
-caIssuers;URI.0         = $aia_url
-OCSP;URI.0              = $ocsp_url/identity

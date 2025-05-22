@@ -24,4 +24,3 @@ commonName              = ${ENV::CN}
 keyUsage                = critical,digitalSignature
 extendedKeyUsage        = clientAuth,pkInitClientAuth
 subjectKeyIdentifier    = hash
-tlsfeature              = status_request

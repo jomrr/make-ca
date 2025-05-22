@@ -25,4 +25,3 @@ keyUsage                = critical,digitalSignature,keyEncipherment
 extendedKeyUsage        = clientAuth,serverAuth
 subjectKeyIdentifier    = hash
 subjectAltName          = DNS:${ENV::CN},${ENV::SAN}
-tlsfeature              = status_request

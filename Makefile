@@ -4,6 +4,7 @@
 SHELL			:= bash
 # openssl binary
 OPENSSL			:= /usr/bin/openssl
+OPENSSL_CA		:= $(OPENSSL) ca -batch -new -create_serial
 # destroy directories
 DESTROY			:= archive/ ca/ dist/ pub/
 
