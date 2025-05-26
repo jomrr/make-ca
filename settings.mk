@@ -51,11 +51,13 @@ export DEFAULT_MD		?= sha3-256
 
 # CA Keys:
 # param for openssl genpkey -algorithm $(CAK_ALG)
-CAK_ALG					?= ED25519
-#CAK_ALG					?= RSA -pkeyopt rsa_keygen_bits:8192
-
+# NOTE: ED25519 CA certificates still fail to import in Browsers
+#CAK_ALG					?= ED25519
+#CAK_ALG					?= RSA -pkeyopt rsa_keygen_bits:$(DEFAULT_BITS)
+CAK_ALG					?= EC -pkeyopt ec_paramgen_curve:P-384
 # Certificate Private Keys
 # param for openssl genpkey -algorithm $(CPK_ALG)
-# NOTE: ED25519 p12 client certificates still fail to import in Browsers
+# NOTE: ED25519 client certificates still fail to import in Browsers
 #CPK_ALG					?= ED25519
-CPK_ALG					?= RSA -pkeyopt rsa_keygen_bits:$(DEFAULT_BITS)
+#CPK_ALG					?= RSA -pkeyopt rsa_keygen_bits:$(DEFAULT_BITS)
+CPK_ALG					?= EC -pkeyopt ec_paramgen_curve:P-384
