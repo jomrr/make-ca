@@ -1,4 +1,4 @@
-[ default ]
+[default]
 ca                      = root-ca               # Current CA name
 dir                     = ca                    # Top dir
 base_url                = ${ENV::BASE_URL}      # CA base URL
@@ -10,7 +10,7 @@ default_md              = ${ENV::DEFAULT_MD}    # default MD to use
 
 # CA certificate request
 
-[ req ]
+[req]
 default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
 encrypt_key             = yes                   # Protect private key
 default_md              = $default_md           # MD to use
@@ -20,7 +20,7 @@ prompt                  = no                    # Don't prompt for DN
 distinguished_name      = common_dn             # DN section
 req_extensions          = common_ca_ext         # Desired extensions
 
-[ common_dn ]
+[common_dn]
 countryName             = ${ENV::DN_C}
 stateOrProvinceName     = ${ENV::DN_ST}
 localityName            = ${ENV::DN_L}
@@ -28,17 +28,17 @@ organizationName        = ${ENV::DN_O}
 organizationalUnitName  = ${ENV::DN_OU}
 commonName              = ${ENV::DN_O} Root CA
 
-[ common_ca_ext ]
+[common_ca_ext]
 keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true
 subjectKeyIdentifier    = hash
 
 # CA operational settings
 
-[ ca ]
+[ca]
 default_ca              = root_ca
 
-[ root_ca ]
+[root_ca]
 certificate             = $dir/certs/$ca.pem    # The CA cert
 private_key             = $dir/private/$ca.key  # CA private key
 new_certs_dir           = $dir/new              # Certificate archive
@@ -58,7 +58,7 @@ x509_extensions         = ca_ext                # Default cert extensions
 default_crl_days        = 30                    # How long before next CRL
 crl_extensions          = crl_ext               # CRL extensions
 
-[ match_pol ]
+[match_pol]
 countryName             = match
 stateOrProvinceName     = optional
 localityName            = optional
@@ -68,7 +68,7 @@ commonName              = supplied
 
 # X509 Extensions
 
-[ ca_ext ]
+[ca_ext]
 keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true
 subjectKeyIdentifier    = hash
@@ -76,12 +76,12 @@ authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
-[ crl_ext ]
+[crl_ext]
 authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
 
-[ crl_info ]
+[crl_info]
 URI.0                   = $crl_url
 
-[ issuer_info ]
+[issuer_info]
 caIssuers;URI.0         = $aia_url

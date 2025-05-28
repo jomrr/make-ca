@@ -1,8 +1,8 @@
 # TLS server certificate request
-[ default ]
+[default]
 SAN                     = DNS:*.${ENV::CN}
 
-[ req ]
+[req]
 default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
 encrypt_key             = no                    # Protect private key
 default_md              = ${ENV::DEFAULT_MD}    # MD to use
@@ -12,7 +12,7 @@ prompt                  = no                    # Prompt for DN
 distinguished_name      = server_dn             # DN template
 req_extensions          = server_reqext         # Desired extensions
 
-[ server_dn ]
+[server_dn]
 countryName             = ${ENV::DN_C}
 stateOrProvinceName     = ${ENV::DN_ST}
 localityName            = ${ENV::DN_L}
@@ -20,7 +20,7 @@ organizationName        = ${ENV::DN_O}
 organizationalUnitName  = ${ENV::DN_OU}
 commonName              = ${ENV::CN}
 
-[ server_reqext ]
+[server_reqext]
 keyUsage                = critical,digitalSignature,keyEncipherment
 extendedKeyUsage        = clientAuth,serverAuth
 subjectKeyIdentifier    = hash

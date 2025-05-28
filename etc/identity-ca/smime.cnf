@@ -2,7 +2,7 @@
 [default]
 SAN                     = email:${ENV::EMAIL}
 
-[ req ]
+[req]
 default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
 encrypt_key             = no                    # Protect private key
 default_md              = ${ENV::DEFAULT_MD}    # MD to use
@@ -12,7 +12,7 @@ prompt                  = no                    # Prompt for DN
 distinguished_name      = email_dn              # DN template
 req_extensions          = email_reqext          # Desired extensions
 
-[ email_dn ]
+[email_dn]
 countryName             = ${ENV::DN_C}
 stateOrProvinceName     = ${ENV::DN_ST}
 localityName            = ${ENV::DN_L}
@@ -21,7 +21,7 @@ organizationalUnitName  = ${ENV::DN_OU}
 commonName              = ${ENV::CN}
 emailAddress            = ${ENV::EMAIL}
 
-[ email_reqext ]
+[email_reqext]
 keyUsage                = critical,nonRepudiation,digitalSignature,keyEncipherment
 extendedKeyUsage        = emailProtection
 subjectKeyIdentifier    = hash

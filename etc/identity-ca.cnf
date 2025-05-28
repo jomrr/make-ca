@@ -1,4 +1,4 @@
-[ default ]
+[default]
 ca                      = identity-ca           # Current CA name
 dir                     = ca                    # Top dir
 base_url                = ${ENV::BASE_URL}      # CA base URL
@@ -10,7 +10,7 @@ default_md              = ${ENV::DEFAULT_MD}    # default MD to use
 
 # CA certificate request
 
-[ req ]
+[req]
 default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
 encrypt_key             = yes                   # Protect private key
 default_md              = $default_md           # MD to use
@@ -20,7 +20,7 @@ prompt                  = no                    # Don't prompt for DN
 distinguished_name      = ca_dn                 # DN section
 req_extensions          = ca_reqext             # Desired extensions
 
-[ ca_dn ]
+[ca_dn]
 countryName             = ${ENV::DN_C}
 stateOrProvinceName     = ${ENV::DN_ST}
 localityName            = ${ENV::DN_L}
@@ -28,17 +28,17 @@ organizationName        = ${ENV::DN_O}
 organizationalUnitName  = ${ENV::DN_OU}
 commonName              = ${ENV::DN_O} Identity CA
 
-[ ca_reqext ]
+[ca_reqext]
 keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true,pathlen:0
 subjectKeyIdentifier    = hash
 
 # CA operational settings
 
-[ ca ]
+[ca]
 default_ca              = identity_ca
 
-[ identity_ca ]
+[identity_ca]
 certificate             = $dir/certs/$ca.pem    # The CA cert
 private_key             = $dir/private/$ca.key  # CA private key
 new_certs_dir           = $dir/new              # Certificate archive
@@ -58,7 +58,7 @@ x509_extensions         = smime_ext             # Default cert extensions
 default_crl_days        = 1                     # How long before next CRL
 crl_extensions          = crl_ext               # CRL extensions
 
-[ match_pol ]
+[match_pol]
 countryName             = match
 stateOrProvinceName     = optional
 localityName            = optional
@@ -69,7 +69,7 @@ emailAddress            = supplied
 
 # X509 Extensions
 
-[ smime_ext ]
+[smime_ext]
 keyUsage                = critical,nonRepudiation,digitalSignature
 extendedKeyUsage        = emailProtection
 subjectKeyIdentifier    = hash
@@ -77,7 +77,7 @@ authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
-[ smartcard_ext ]
+[smartcard_ext]
 keyUsage                = critical,nonRepudiation,digitalSignature,keyEncipherment
 extendedKeyUsage        = clientAuth,codeSigning,emailProtection,msEFS,msSmartcardLogin
 subjectKeyIdentifier    = hash
@@ -85,12 +85,12 @@ authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
-[ crl_ext ]
+[crl_ext]
 authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
 
-[ crl_info ]
+[crl_info]
 URI.0                   = $crl_url
 
-[ issuer_info ]
+[issuer_info]
 caIssuers;URI.0         = $aia_url
