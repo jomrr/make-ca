@@ -29,8 +29,8 @@ organizationalUnitName  = ${ENV::DN_OU}
 commonName              = ${ENV::DN_O} Root CA
 
 [common_ca_ext]
-keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true
+keyUsage                = critical,keyCertSign,cRLSign
 subjectKeyIdentifier    = hash
 
 # CA operational settings
@@ -69,8 +69,8 @@ commonName              = supplied
 # X509 Extensions
 
 [ca_ext]
-keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true
+keyUsage                = critical,keyCertSign,cRLSign
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info

@@ -29,8 +29,8 @@ organizationalUnitName  = ${ENV::DN_OU}
 commonName              = ${ENV::DN_O} Identity CA
 
 [ca_reqext]
-keyUsage                = critical,keyCertSign,cRLSign
 basicConstraints        = critical,CA:true,pathlen:0
+keyUsage                = critical,keyCertSign,cRLSign
 subjectKeyIdentifier    = hash
 
 # CA operational settings

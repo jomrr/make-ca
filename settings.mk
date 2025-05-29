@@ -45,7 +45,7 @@ export DEFAULT_BITS	?= 4096
 
 # default settings for hash in cnf files
 # Ok, I am shocked again. 2025 and sha3-256 is not a valid signature algorithm.
-export DEFAULT_MD	?= sha256
+export DEFAULT_MD	?= sha384
 
 # The Ed25519 digital signature algorithm is supported by the Web Crypto API,
 # and can be used in the SubtleCrypto methods: sign(), verify(), generateKey(),
