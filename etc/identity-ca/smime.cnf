@@ -22,6 +22,7 @@ commonName              = ${ENV::CN}
 emailAddress            = ${ENV::EMAIL}
 
 [email_reqext]
+basicConstraints        = critical,CA:FALSE
 keyUsage                = critical,nonRepudiation,digitalSignature,keyEncipherment
 extendedKeyUsage        = emailProtection
 subjectKeyIdentifier    = hash

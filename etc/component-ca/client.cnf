@@ -21,6 +21,7 @@ organizationalUnitName  = ${ENV::DN_OU}
 commonName              = ${ENV::CN}
 
 [client_reqext]
+basicConstraints        = critical,CA:FALSE
 keyUsage                = critical,digitalSignature
 extendedKeyUsage        = clientAuth,pkInitClientAuth
 subjectKeyIdentifier    = hash

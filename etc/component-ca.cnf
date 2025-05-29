@@ -69,6 +69,7 @@ commonName              = supplied
 # X509 Extensions
 
 [client_ext]
+basicConstraints        = critical,CA:FALSE
 keyUsage                = critical,digitalSignature
 extendedKeyUsage        = clientAuth,pkInitClientAuth
 subjectKeyIdentifier    = hash
@@ -77,6 +78,7 @@ authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
 [server_ext]
+basicConstraints        = critical,CA:FALSE
 keyUsage                = critical,digitalSignature,keyEncipherment
 extendedKeyUsage        = clientAuth,serverAuth
 subjectKeyIdentifier    = hash
@@ -85,6 +87,7 @@ authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
 [timestamp_ext]
+basicConstraints        = critical,CA:FALSE
 keyUsage                = critical,digitalSignature
 extendedKeyUsage        = critical,timeStamping
 subjectKeyIdentifier    = hash

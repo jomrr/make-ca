@@ -70,6 +70,7 @@ emailAddress            = supplied
 # X509 Extensions
 
 [smime_ext]
+basicConstraints        = critical,CA:FALSE
 keyUsage                = critical,nonRepudiation,digitalSignature
 extendedKeyUsage        = emailProtection
 subjectKeyIdentifier    = hash
@@ -78,6 +79,7 @@ authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
 [smartcard_ext]
+basicConstraints        = critical,CA:FALSE
 keyUsage                = critical,nonRepudiation,digitalSignature,keyEncipherment
 extendedKeyUsage        = clientAuth,codeSigning,emailProtection,msEFS,msSmartcardLogin
 subjectKeyIdentifier    = hash
