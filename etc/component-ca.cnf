@@ -80,7 +80,7 @@ crlDistributionPoints   = @crl_info
 [server_ext]
 basicConstraints        = critical,CA:FALSE
 keyUsage                = critical,digitalSignature,keyEncipherment
-extendedKeyUsage        = clientAuth,serverAuth
+extendedKeyUsage        = serverAuth
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info

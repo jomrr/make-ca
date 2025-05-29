@@ -23,6 +23,6 @@ commonName              = ${ENV::CN}
 [server_reqext]
 basicConstraints        = critical,CA:FALSE
 keyUsage                = critical,digitalSignature,keyEncipherment
-extendedKeyUsage        = clientAuth,serverAuth
+extendedKeyUsage        = serverAuth
 subjectKeyIdentifier    = hash
 subjectAltName          = DNS:${ENV::CN},${ENV::SAN}
