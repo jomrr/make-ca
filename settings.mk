@@ -40,13 +40,7 @@ export BASE_URL		:= http://pki.example.com
 # Key and hash algorithm settings
 ################################################################################
 
-# default RSA bit length in cnf files
-export DEFAULT_BITS	?= 4096
-
-# default settings for hash in cnf files
-# Ok, I am shocked again. 2025 and sha3-256 is not a valid signature algorithm.
-export DEFAULT_MD	?= sha384
-
+# Defaulting to RSA 4096 and sha384 for CA and certificate private keys for now.
 # The Ed25519 digital signature algorithm is supported by the Web Crypto API,
 # and can be used in the SubtleCrypto methods: sign(), verify(), generateKey(),
 # importKey() and exportKey() (Firefox bug 1804788).
@@ -54,20 +48,31 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1804788
 # But Firefox still does not support Ed25519 keys as
 # client certificates (PKCS12) via NSS in 2025!!!
 https://bugzilla.mozilla.org/show_bug.cgi?id=1598515
-
-# Defaulting to secp384r1 (P-384) for CA and certificate private keys for now.
 # secp521r1 (P-521) support was removed by Mozilla and Google in 2024.
+
+# default RSA bit length in cnf files
+export DEFAULT_BITS	?= 4096
+
+# default settings for hash in cnf files
+# Ok, I am shocked again. 2025 and sha3-256 is not a valid signature algorithm.
+export DEFAULT_MD	?= sha384
+
+# Algorithms for CA private keys for easier assignment in Makefile
+# Example 1: make init CAK_ALG=ED25519
+# Example 2: make init CAK_ALG=\$\(P384\)
+
+export ED25519		:= ED25519
+export ED448		:= ED448
+export P384		:= EC -pkeyopt ec_paramgen_curve:P-384
+export P521		:= EC -pkeyopt ec_paramgen_curve:P-521
+export RSA		:= RSA -pkeyopt rsa_keygen_bits:$(DEFAULT_BITS)
 
 # CA private Keys:
 # param for openssl genpkey -algorithm $(CAK_ALG)
 
-#CAK_ALG			?= ED25519
-CAK_ALG			?= RSA -pkeyopt rsa_keygen_bits:$(DEFAULT_BITS)
-#CAK_ALG			?= EC -pkeyopt ec_paramgen_curve:P-384
+CAK_ALG			?= $(RSA)
 
 # Certificate Private Keys:
 # param for openssl genpkey -algorithm $(CPK_ALG)
 
-#CPK_ALG			?= ED25519
-CPK_ALG			?= RSA -pkeyopt rsa_keygen_bits:$(DEFAULT_BITS)
-#CPK_ALG			?= EC -pkeyopt ec_paramgen_curve:P-384
+CPK_ALG			?= $(RSA)

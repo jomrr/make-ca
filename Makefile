@@ -228,12 +228,15 @@ archive/ ca/db/ ca/new/ ca/private/ ca/reqs/: | ca/
 ca/ ca/certs/ dist/ pub/ dist/$(CA)/$(CERT_TYPE)/:
 	@mkdir -m 755 -p $@
 
-# basic smoke test
+# basic tests
 .PHONY: test
+test-vars:
+	echo "CAK_ALG: $(CAK_ALG)"
+	echo "CPK_ALG: $(CPK_ALG)"
 test:
 	$(MAKE) force-destroy 1>/dev/null
-	CAK_ALG=ED25519 $(MAKE) init 1>/dev/null
-	CAK_ALG=ED25519 $(MAKE) crls 1>/dev/null
+	$(MAKE) init 1>/dev/null
+	$(MAKE) crls 1>/dev/null
 	$(MAKE) certs/component-ca/server/fritzbox 1>/dev/null
 	$(MAKE) revoke/component-ca/server/fritzbox REASON=superseded 1>/dev/null
 	$(MAKE) crls 1>/dev/null
