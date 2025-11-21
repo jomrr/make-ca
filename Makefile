@@ -82,13 +82,23 @@ init crls: $(foreach ca,$(ALL_CA),pub/$(ca).crl)
 .PHONY: print
 print:
 	@for DB in ca/db/*.txt; do \
-		BASENAME=$$(basename "$$DB" .txt); \
-		CA_SLUG=$$(echo "$$BASENAME"); \
-		awk -v filename="$$CA_SLUG" '{ \
-			gsub(/[ \t]+/, " "); \
-			printf "%s %s\n", filename, $$0; \
-		}' "$$DB"; \
-	done
+		CA_SLUG=$$(basename "$$DB" .txt); \
+		awk -v ca="$$CA_SLUG" ' \
+		BEGIN { FS="[ \t]+" } \
+		{ \
+			status=$$1; notafter=$$2; \
+			if (status=="R") { \
+				revoked=$$3; serial=$$4; file=$$5; start=6; \
+			} else { \
+				revoked=""; serial=$$3; file=$$4; start=5; \
+			} \
+			subj=""; \
+			for(i=start;i<=NF;i++) subj=subj (i==start?"":" ") $$i; \
+			printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", \
+				ca, status, notafter, revoked, serial, file, subj; \
+		} \
+    	' "$$DB"; \
+	done | column -t -s $$'\t'
 
 # create Private KEY
 dist/%.key: | dist/
