@@ -2,8 +2,10 @@
 ca                      = intermediate-ca       # Current CA name
 dir                     = ca                    # Top dir
 base_url                = ${ENV::BASE_URL}      # CA base URL
-aia_url                 = $base_url/$ca.der     # CA certificate URL
-crl_url                 = $base_url/$ca.crl     # CRL distribution point
+prefix                  = ${ENV::CA_PUB_PREFIX} # CA prefix
+base                    = $base_url/$prefix     # CA base URL + Prefix
+aia_url                 = $base-$ca.der         # CA certificate URL
+crl_url                 = $base-$ca.crl         # CRL distribution point
 name_opt                = ca_default            # Subject name display option
 cert_opt                = ca_default            # Certificate display option
 default_md              = ${ENV::DEFAULT_MD}    # default MD to use

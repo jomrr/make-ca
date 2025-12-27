@@ -9,6 +9,7 @@ ISSUING_CA		:= component-ca identity-ca
 ALL_CA			:= $(ROOT_CA) $(SIGNING_CA) $(ISSUING_CA)
 
 # distiguished name defaults
+export CA_PUB_PREFIX	:= mauer
 export DN_C		?= DE
 export DN_ST		?= Bayern
 export DN_L		?= Strunzenoed

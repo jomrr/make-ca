@@ -1,5 +1,6 @@
 # TLS certificate request for AVM FritzBox
 [default]
+# obfuscated and random CN for demonstrational purposes ;)
 CN                      = wsroikgniugb7373e4t4.myfritz.net
 
 [req]

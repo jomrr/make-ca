@@ -1,5 +1,5 @@
 # Makefile for operating a certificate authority
-
+MAKEFLAGS		+= --no-builtin-rules
 # shell to use
 SHELL			:= bash
 # openssl binary
@@ -33,11 +33,11 @@ include 		targets.mk
 	dist/%.pwd \
 	dist/%.txt \
 	etc/%.cnf \
-	pub/%.der \
-	pub/%.pem \
-	pub/%.txt \
-	pub/%-chain.der \
-	pub/%-chain.pem
+	pub/$(CA_PUB_PREFIX)-%.der \
+	pub/$(CA_PUB_PREFIX)-%.pem \
+	pub/$(CA_PUB_PREFIX)-%.txt \
+	pub/$(CA_PUB_PREFIX)-%-chain.der \
+	pub/$(CA_PUB_PREFIX)-%-chain.pem
 
 # ******************************************************************************
 # make targets start here
@@ -71,12 +71,12 @@ destroy:
 	@rm -Ir $(DESTROY)
 
 # destroy everything without asking
-force-destroy:
+force-destroy mrproper:
 	@rm -rf $(DESTROY)
 
 # init all CAs and generate initial CRLs
 .PHONY: init crls
-init crls: $(foreach ca,$(ALL_CA),pub/$(ca).crl)
+init crls: $(foreach ca,$(ALL_CA),pub/$(CA_PUB_PREFIX)-$(ca).crl)
 
 # print CA db files with CA name for grepping serials, revoked, etc.
 .PHONY: print
@@ -113,12 +113,12 @@ dist/%.pem: dist/%.csr | dist/
 	@$(OPENSSL) ca -batch -notext -create_serial -config etc/$(CA).cnf -in $< -out $@ -extensions $(CERT_TYPE)_ext -passin file:ca/private/$(CA).pwd
 
 # create pkcs12 bundle with key, crt and ca-chain
-dist/%.p12: dist/%.key dist/%.txt pub/$(CA)-chain.pem | dist/
-	@$(OPENSSL) pkcs12 -export -name "$*" -inkey $< -in dist/$*.pem -certfile pub/$(CA)-chain.pem -out $@
+dist/%.p12: dist/%.key dist/%.txt pub/$(CA_PUB_PREFIX)-$(CA)-chain.pem | dist/
+	@$(OPENSSL) pkcs12 -export -name "$*" -inkey $< -in dist/$*.pem -certfile pub/$(CA_PUB_PREFIX)-$(CA)-chain.pem -out $@
 
 # create pem bundle with crt and ca-chain
 dist/%-fullchain.pem: dist/%.pem dist/%.csr
-	@cat $< pub/$(CA)-chain.pem > $@
+	@cat $< pub/$(CA_PUB_PREFIX)-$(CA)-chain.pem > $@
 
 # export certificate in DER format
 dist/%.der: dist/%-fullchain.pem dist/%.pem dist/%.csr
@@ -142,13 +142,13 @@ $(P12S): p12/$(CA)/$(CERT_TYPE)/%: dist/%.p12
 
 # dynamic target for certificate renewal
 .PHONY: $(RENEWS)
-$(RENEWS): renew/$(CA)/$(CERT_TYPE)/%: renew-% dist/%.txt pub/$(CA).crl
+$(RENEWS): renew/$(CA)/$(CERT_TYPE)/%: renew-% dist/%.txt pub/$(CA_PUB_PREFIX)-$(CA).crl
 	@echo "RENEW: $@"
 	@ls -la dist/$*.*
 
 # dynamic target for certificate revocation
 .PHONY: $(REVOKES)
-$(REVOKES): revoke/$(CA)/$(CERT_TYPE)/%: revoke-% pub/$(CA).crl
+$(REVOKES): revoke/$(CA)/$(CERT_TYPE)/%: revoke-% pub/$(CA_PUB_PREFIX)-$(CA).crl
 	@echo "REVOKE: $@"
 	@ls -la archive/$*.*
 
@@ -169,32 +169,32 @@ archive/%.tar.gz: | archive/
 	@tar -czvf "archive/$*.$(DATETIME).tar.gz" dist/$*.*
 
 # generate CRL for CAs and initialize if needed
-pub/%.crl: pub/%-chain.der ca/db/%.txt | ca/db/%.crlnumber pub/
-	@$(OPENSSL) ca -gencrl -config etc/$*.cnf -passin file:ca/private/$*.pwd -out pub/$*.crl.pem
-	@$(OPENSSL) crl -in "pub/$*.crl.pem" -out $@ -outform DER
+pub/$(CA_PUB_PREFIX)-%.crl: pub/$(CA_PUB_PREFIX)-%-chain.der ca/db/%.txt | ca/db/%.crlnumber pub/
+	@$(OPENSSL) ca -gencrl -config etc/$*.cnf -passin file:ca/private/$*.pwd -out pub/$(CA_PUB_PREFIX)-$*.crl.pem
+	@$(OPENSSL) crl -in "pub/$(CA_PUB_PREFIX)-$*.crl.pem" -out $@ -outform DER
 
-pub/%-chain.der: pub/%-chain.pem | pub/
+pub/$(CA_PUB_PREFIX)-%-chain.der: pub/$(CA_PUB_PREFIX)-%-chain.pem | pub/
 	@$(OPENSSL) x509 -in $< -out $@ -outform DER
 
-pub/root-ca-chain.pem: pub/%-chain.pem: pub/%.txt | pub/
-	@cat pub/root-ca.pem > $@
+pub/$(CA_PUB_PREFIX)-root-ca-chain.pem: pub/$(CA_PUB_PREFIX)-%-chain.pem: pub/$(CA_PUB_PREFIX)-%.txt | pub/
+	@cat pub/$(CA_PUB_PREFIX)-root-ca.pem > $@
 
-pub/intermediate-ca-chain.pem: pub/%-chain.pem: pub/%.pem pub/%.txt | pub/
-	@cat $< pub/root-ca.pem > $@
+pub/$(CA_PUB_PREFIX)-intermediate-ca-chain.pem: pub/$(CA_PUB_PREFIX)-%-chain.pem: pub/$(CA_PUB_PREFIX)-%.pem pub/$(CA_PUB_PREFIX)-%.txt | pub/
+	@cat $< pub/$(CA_PUB_PREFIX)-root-ca.pem > $@
 
 # create PEM certificate chain for issuing ca
-pub/%-chain.pem: pub/%.pem pub/%.txt | pub/
-	@cat $< pub/intermediate-ca.pem pub/root-ca.pem > $@
+pub/$(CA_PUB_PREFIX)-%-chain.pem: pub/$(CA_PUB_PREFIX)-%.pem pub/$(CA_PUB_PREFIX)-%.txt | pub/
+	@cat $< pub/$(CA_PUB_PREFIX)-intermediate-ca.pem pub/$(CA_PUB_PREFIX)-root-ca.pem > $@
 
-pub/%.txt: pub/%.der | pub/
+pub/$(CA_PUB_PREFIX)-%.txt: pub/$(CA_PUB_PREFIX)-%.der | pub/
 	@$(OPENSSL) x509 -in $< -text -noout > $@
 
 # create DER export of ca certificate
-pub/%.der: pub/%.pem | pub/
+pub/$(CA_PUB_PREFIX)-%.der: pub/$(CA_PUB_PREFIX)-%.pem | pub/
 	@$(OPENSSL) x509 -in $< -out $@ -outform DER
 
 # export ca certificate in PEM format. it already should be.
-pub/%.pem: ca/certs/%.pem | pub/
+pub/$(CA_PUB_PREFIX)-%.pem: ca/certs/%.pem | pub/
 	@$(OPENSSL) x509 -in $< -out $@ -outform PEM
 
 # generate root ca certificate
@@ -244,10 +244,10 @@ test-vars:
 	echo "CAK_ALG: $(CAK_ALG)"
 	echo "CPK_ALG: $(CPK_ALG)"
 test:
-	$(MAKE) force-destroy 1>/dev/null
+	$(MAKE) mrproper 1>/dev/null
 	$(MAKE) init 1>/dev/null
 	$(MAKE) crls 1>/dev/null
 	$(MAKE) certs/component-ca/server/fritzbox 1>/dev/null
 	$(MAKE) revoke/component-ca/server/fritzbox REASON=superseded 1>/dev/null
 	$(MAKE) crls 1>/dev/null
-	$(MAKE) force-destroy 1>/dev/null
+	$(MAKE) mrproper 1>/dev/null
