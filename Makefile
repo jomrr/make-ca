@@ -28,6 +28,12 @@ include		settings.mk
 # variables for dynamic targets
 include 	targets.mk
 
+# dist per ca and cert type for easier management of artifacts
+DIST_BASE	:= dist/$(CA)/$(CERT_TYPE)
+
+# do not treat as intermediate targets, to prevent deletion
+.NOTINTERMEDIATE: dist/%/ $(DIST_BASE)/%/
+
 # keep these files
 .PRECIOUS: \
 	ca/certs/%.pem \
@@ -38,14 +44,14 @@ include 	targets.mk
 	ca/private/%.key \
 	ca/private/%.pwd \
 	ca/reqs/%.csr \
-	dist/%.csr \
-	dist/%.der \
-	dist/%.key \
-	dist/%.p12 \
-	dist/%.pem \
-	dist/%-fullchain.pem \
-	dist/%.pwd \
-	dist/%.txt \
+	$(DIST_BASE)/%/bundle.p12 \
+	$(DIST_BASE)/%/certificate.der \
+	$(DIST_BASE)/%/certificate.pem \
+	$(DIST_BASE)/%/certificate.txt \
+	$(DIST_BASE)/%/fullchain.pem \
+	$(DIST_BASE)/%/private.key \
+	$(DIST_BASE)/%/private.pwd \
+	$(DIST_BASE)/%/request.csr \
 	etc/%.cnf \
 	pub/%.der \
 	pub/%.pem \
@@ -72,7 +78,7 @@ all: init
 # delete CSRs in dist/
 .PHONY: clean
 clean:
-	@rm -f dist/*.csr
+	@test ! -d dist || find dist -type f -name request.csr -delete
 
 # delete dist/
 .PHONY: distclean
@@ -103,76 +109,76 @@ print-full:
 	@bin/print --full ca/db
 
 # create Private KEY
-dist/%.key: | dist/
+$(DIST_BASE)/%/private.key: | $(DIST_BASE)/%/
 	@umask 077; $(OPENSSL) genpkey -out $@ -algorithm $(CPK_ALG)
 	@chmod 600 $@
 
 # create CSR, config is selected by calling target
-dist/%.csr: dist/%.key etc/$(CA)/$(CERT_TYPE)/%.cnf | dist/
-	@$(OPENSSL) req -batch -new -config etc/$(CA)/$(CERT_TYPE)/$*.cnf -key dist/$*.key -out $@ -outform PEM
+$(DIST_BASE)/%/request.csr: $(DIST_BASE)/%/private.key etc/$(CA)/$(CERT_TYPE)/%.cnf | $(DIST_BASE)/%/
+	@$(OPENSSL) req -batch -new -config etc/$(CA)/$(CERT_TYPE)/$*.cnf -key $(DIST_BASE)/$*/private.key -out $@ -outform PEM
 
 # issue PEM certificate from CSR
-dist/%.pem: dist/%.csr etc/$(CA).cnf ca/certs/$(CA).pem ca/private/$(CA).key ca/private/$(CA).pwd | dist/
+$(DIST_BASE)/%/certificate.pem: $(DIST_BASE)/%/request.csr etc/$(CA).cnf ca/certs/$(CA).pem ca/private/$(CA).key ca/private/$(CA).pwd | $(DIST_BASE)/%/
 	@$(OPENSSL) ca -batch -notext -create_serial -config etc/$(CA).cnf -in $< -out $@ -extensions $(CERT_TYPE)_ext -passin file:ca/private/$(CA).pwd
 
 # create pkcs12 bundle with key, crt and ca-chain
-dist/%.p12: dist/%.key dist/%.pem pub/$(CA)-chain.pem | dist/
-	@umask 077; $(OPENSSL) pkcs12 -export -name "$*" -inkey $< -in dist/$*.pem -certfile pub/$(CA)-chain.pem -out $@
+$(DIST_BASE)/%/bundle.p12: $(DIST_BASE)/%/private.key $(DIST_BASE)/%/certificate.pem pub/$(CA)-chain.pem | $(DIST_BASE)/%/
+	@umask 077; $(OPENSSL) pkcs12 -export -name "$*" -inkey $< -in $(DIST_BASE)/$*/certificate.pem -certfile pub/$(CA)-chain.pem -out $@
 	@chmod 600 $@
 
 # create pem bundle with crt and ca-chain
-dist/%-fullchain.pem: dist/%.pem pub/$(CA)-chain.pem
+$(DIST_BASE)/%/fullchain.pem: $(DIST_BASE)/%/certificate.pem pub/$(CA)-chain.pem
 	@cat $< pub/$(CA)-chain.pem > $@
 
 # export certificate in DER format
-dist/%.der: dist/%.pem
-	@$(OPENSSL) x509 -in dist/$*.pem -out $@ -outform DER
+$(DIST_BASE)/%/certificate.der: $(DIST_BASE)/%/certificate.pem
+	@$(OPENSSL) x509 -in $< -out $@ -outform DER
 
 # export certificate in txt format
-dist/%.txt: dist/%.pem
-	@$(OPENSSL) x509 -in dist/$*.pem -text -noout > $@
+$(DIST_BASE)/%/certificate.txt: $(DIST_BASE)/%/certificate.pem
+	@$(OPENSSL) x509 -in $< -text -noout > $@
 
 # dynamic target for certificate generation
 .PHONY: $(CERTS)
-$(CERTS): certs/$(CA)/$(CERT_TYPE)/%: dist/%.csr dist/%.pem dist/%-fullchain.pem dist/%.der dist/%.txt
+$(CERTS): certs/$(CA)/$(CERT_TYPE)/%: $(DIST_BASE)/%/request.csr $(DIST_BASE)/%/certificate.pem $(DIST_BASE)/%/fullchain.pem $(DIST_BASE)/%/certificate.der $(DIST_BASE)/%/certificate.txt
 	@echo "CERT: $@"
-	@ls -la dist/$*.*
+	@ls -la $(DIST_BASE)/$*/
 
 # dynamic target for p12 bundle generation
 .PHONY: $(P12S)
-$(P12S): p12/$(CA)/$(CERT_TYPE)/%: dist/%.p12
+$(P12S): p12/$(CA)/$(CERT_TYPE)/%: $(DIST_BASE)/%/bundle.p12
 	@echo "P12: $@"
-	@ls -la dist/$*.p12
+	@ls -la $(DIST_BASE)/$*/bundle.p12
 
 # dynamic target for certificate renewal
 .PHONY: $(RENEWS)
-$(RENEWS): renew/$(CA)/$(CERT_TYPE)/%: renew-% dist/%.txt pub/$(CA).crl
+$(RENEWS): renew/$(CA)/$(CERT_TYPE)/%: renew-% $(DIST_BASE)/%/certificate.txt pub/$(CA).crl
 	@echo "RENEW: $@"
-	@ls -la dist/$*.*
+	@ls -la $(DIST_BASE)/$*/
 
 # dynamic target for certificate revocation
 .PHONY: $(REVOKES)
 $(REVOKES): revoke/$(CA)/$(CERT_TYPE)/%: revoke-% pub/$(CA).crl
 	@echo "REVOKE: $@"
-	@ls -la archive/$*.*
+	@ls -la archive/$(CA)-$(CERT_TYPE)-$*.*
 
 # renew a certificate with existing key
 .PHONY: renew-%
 renew-%: archive-%
-	@$(OPENSSL) ca -batch -config etc/$(CA).cnf -revoke dist/$*.pem -passin file:ca/private/$(CA).pwd -crl_reason superseded
-	@rm -f dist/$*.{csr,der,pem,p12,txt} dist/$*-fullchain.pem
+	@$(OPENSSL) ca -batch -config etc/$(CA).cnf -revoke $(DIST_BASE)/$*/certificate.pem -passin file:ca/private/$(CA).pwd -crl_reason superseded
+	@rm -f $(DIST_BASE)/$*/*.{csr,der,pem,p12,txt}
 
 # revoke a certificate
 .PHONY: revoke-%
 revoke-%: archive-%
-	@$(OPENSSL) ca -batch -config etc/$(CA).cnf -revoke dist/$*.pem -passin file:ca/private/$(CA).pwd -crl_reason $(REASON)
-	@rm -f dist/$*.{csr,der,key,pem,p12,pwd,txt} dist/$*-fullchain.pem
+	@$(OPENSSL) ca -batch -config etc/$(CA).cnf -revoke $(DIST_BASE)/$*/certificate.pem -passin file:ca/private/$(CA).pwd -crl_reason $(REASON)
+	@rm -rf $(DIST_BASE)/$*/
 
 # create archive of certificate artifacts
 .PHONY: archive-%
 archive-%: | archive/
-	@test -f dist/$*.pem || { echo "error: missing dist/$*.pem" >&2; exit 2; }
-	@tar -czvf "archive/$*.$(DATETIME).tar.gz" dist/$*.* dist/$*-fullchain.pem
+	@test -f $(DIST_BASE)/$*/certificate.pem || { echo "error: missing $(DIST_BASE)/$*/certificate.pem" >&2; exit 2; }
+	@tar -czvf "archive/$(CA)-$(CERT_TYPE)-$*.$(DATETIME).tar.gz" $(DIST_BASE)/$*/
 
 # generate CRL for CAs and initialize if needed
 pub/%.crl: pub/%-chain.der ca/db/%.txt | ca/db/%.crlnumber pub/
@@ -240,11 +246,17 @@ ca/private/%.pwd: | ca/private/
 	@umask 077; $(OPENSSL) rand -hex 64 > $@
 	@chmod 600 $@
 
-archive/ ca/db/ ca/new/ ca/private/ ca/reqs/ dist/: | ca/
-	@install -d -m 700 $@
-
 ca/ ca/certs/ pub/:
 	@install -d -m 755 $@
+
+ca/db/ ca/new/ ca/private/ ca/reqs/: | ca/
+	@install -d -m 700 $@
+
+archive/ dist/:
+	@install -d -m 700 $@
+
+dist/%/: | dist/
+	@install -d -m 700 $@
 
 # basic tests
 .PHONY: test-vars
