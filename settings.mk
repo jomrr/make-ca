@@ -9,7 +9,6 @@ ISSUING_CA		:= component-ca identity-ca
 ALL_CA			:= $(ROOT_CA) $(SIGNING_CA) $(ISSUING_CA)
 
 # distiguished name defaults
-export CA_PUB_PREFIX	:= mauer
 export DN_C		?= DE
 export DN_ST		?= Bayern
 export DN_L		?= Strunzenoed
@@ -45,10 +44,10 @@ export BASE_URL		:= http://pki.example.com
 # The Ed25519 digital signature algorithm is supported by the Web Crypto API,
 # and can be used in the SubtleCrypto methods: sign(), verify(), generateKey(),
 # importKey() and exportKey() (Firefox bug 1804788).
-https://bugzilla.mozilla.org/show_bug.cgi?id=1804788
+# Ref: https://bugzilla.mozilla.org/show_bug.cgi?id=1804788
 # But Firefox still does not support Ed25519 keys as
 # client certificates (PKCS12) via NSS in 2025!!!
-https://bugzilla.mozilla.org/show_bug.cgi?id=1598515
+# Ref: https://bugzilla.mozilla.org/show_bug.cgi?id=1598515
 # secp521r1 (P-521) support was removed by Mozilla and Google in 2024.
 
 # default RSA bit length in cnf files

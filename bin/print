@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+# Print OpenSSL CA database records in compact or full tabular format.
+
+set -euo pipefail
+
+format_date() {
+  local -r raw_date="$1"
+  local yy=""
+  local year=""
+
+  if [[ ! "$raw_date" =~ ^[0-9]{12}Z$ ]]; then
+    printf '%s\n' "$raw_date"
+    return 0
+  fi
+
+  yy="${raw_date:0:2}"
+
+  if ((10#$yy >= 50)); then
+    year="19${yy}"
+  else
+    year="20${yy}"
+  fi
+
+  printf '%s-%s-%s\n' "$year" "${raw_date:2:2}" "${raw_date:4:2}"
+}
+
+short_serial() {
+  local -r serial="$1"
+
+  if ((${#serial} <= 16)); then
+    printf '%s\n' "$serial"
+    return 0
+  fi
+
+  printf '%s...%s\n' "${serial:0:8}" "${serial: -6}"
+}
+
+extract_cn() {
+  local -r subject="$1"
+  local cn=""
+
+  if [[ "$subject" != *"/CN="* ]]; then
+    printf '%s\n' "$subject"
+    return 0
+  fi
+
+  cn="${subject##*/CN=}"
+  cn="${cn%%/*}"
+
+  printf '%s\n' "$cn"
+}
+
+print_valid_record() {
+  local -r ca_slug="$1"
+  local -r full="$2"
+  local -r not_after="$3"
+  local -r serial="$4"
+  local -r file_ref="$5"
+  local -r subject="$6"
+  local display_serial=""
+  local display_subject=""
+
+  if [[ "$full" == "1" ]]; then
+    printf '%s\tV\t%s\t%s\t%s\t%s\t%s\n' \
+      "$ca_slug" "$(format_date "$not_after")" "" "$serial" "$file_ref" \
+      "$subject"
+    return 0
+  fi
+
+  display_serial="$(short_serial "$serial")"
+  display_subject="$(extract_cn "$subject")"
+
+  printf '%s\tV\t%s\t%s\t%s\n' \
+    "$ca_slug" "$(format_date "$not_after")" "$display_serial" \
+    "$display_subject"
+}
+
+print_revoked_record() {
+  local -r ca_slug="$1"
+  local -r full="$2"
+  local -r not_after="$3"
+  local -r revoked="$4"
+  local -r serial="$5"
+  local -r file_ref="$6"
+  local -r subject="$7"
+  local display_serial=""
+  local display_subject=""
+
+  if [[ "$full" == "1" ]]; then
+    printf '%s\tR\t%s\t%s\t%s\t%s\t%s\n' \
+      "$ca_slug" "$(format_date "$not_after")" "$(format_date "$revoked")" \
+      "$serial" "$file_ref" "$subject"
+    return 0
+  fi
+
+  display_serial="$(short_serial "$serial")"
+  display_subject="$(extract_cn "$subject")"
+
+  printf '%s\tR\t%s\t%s\t%s\n' \
+    "$ca_slug" "$(format_date "$not_after")" "$display_serial" \
+    "$display_subject"
+}
+
+print_record() {
+  local -r ca_slug="$1"
+  local -r full="$2"
+  local -r line="$3"
+  local -a fields=()
+  local status=""
+  local subject=""
+
+  read -r -a fields <<< "$line"
+  status="${fields[0]:-}"
+
+  case "$status" in
+    V|E)
+      if ((${#fields[@]} < 5)); then
+        printf 'error: invalid CA db record: %s\n' "$line" >&2
+        return 2
+      fi
+
+      subject="${fields[*]:4}"
+      print_valid_record \
+        "$ca_slug" "$full" "${fields[1]}" "${fields[2]}" "${fields[3]}" \
+        "$subject"
+      ;;
+    R)
+      if ((${#fields[@]} < 6)); then
+        printf 'error: invalid revoked CA db record: %s\n' "$line" >&2
+        return 2
+      fi
+
+      subject="${fields[*]:5}"
+      print_revoked_record \
+        "$ca_slug" "$full" "${fields[1]}" "${fields[2]}" "${fields[3]}" \
+        "${fields[4]}" "$subject"
+      ;;
+    *)
+      printf 'error: unsupported CA db status "%s": %s\n' "$status" "$line" >&2
+      return 2
+      ;;
+  esac
+}
+
+print_database() {
+  local -r db_file="$1"
+  local -r full="$2"
+  local ca_slug=""
+  local line=""
+
+  ca_slug="$(basename -- "$db_file" .txt)"
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -n "$line" ]] || continue
+    print_record "$ca_slug" "$full" "$line"
+  done < "$db_file"
+}
+
+collect_db_files() {
+  local -a result=()
+  local path=""
+  local db_file=""
+
+  for path in "$@"; do
+    if [[ -d "$path" ]]; then
+      while IFS= read -r -d '' db_file; do
+        result+=("$db_file")
+      done < <(find "$path" -maxdepth 1 -type f -name '*.txt' -print0 | sort -z)
+      continue
+    fi
+
+    if [[ -f "$path" ]]; then
+      result+=("$path")
+      continue
+    fi
+
+    printf 'error: path does not exist: %s\n' "$path" >&2
+    return 2
+  done
+
+  if ((${#result[@]} == 0)); then
+    printf 'error: no CA database files found\n' >&2
+    return 2
+  fi
+
+  printf '%s\0' "${result[@]}"
+}
+
+main() {
+  local full="0"
+  local db_file=""
+  local -a db_files=()
+
+  if [[ "${1:-}" == "--full" ]]; then
+    full="1"
+    shift
+  fi
+
+  if (($# == 0)); then
+    set -- ca/db
+  fi
+
+  while IFS= read -r -d '' db_file; do
+    db_files+=("$db_file")
+  done < <(collect_db_files "$@")
+
+  {
+    if [[ "$full" == "1" ]]; then
+      printf 'CA\tST\tDATE\tREVOKED\tSERIAL\tFILE\tSUBJECT\n'
+    else
+      printf 'CA\tST\tDATE\tSERIAL\tSUBJECT\n'
+    fi
+
+    for db_file in "${db_files[@]}"; do
+      print_database "$db_file" "$full"
+    done
+  } | column -t -s $'\t'
+}
+
+main "$@"

@@ -8,7 +8,7 @@
 # operational settings
 DATETIME	:= $(shell date +%Y-%m-%dT%H:%M:%S%z)
 # static configuration files
-CONFIGS		:= $(shell find etc -mindepth 3 -maxdepth 3 -type f -name "*.cnf")
+CONFIGS		:= $(sort $(wildcard etc/*/*/*.cnf))
 # dynamic targets for p12 bundles
 P12S		:= $(foreach cfg,$(CONFIGS),$(subst .cnf,,$(subst etc/,p12/,$(cfg))))
 # dynamic targets for certificates
