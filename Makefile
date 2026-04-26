@@ -80,6 +80,7 @@ arc = $(subst /,-,$*)
 	ca/db/%.serial \
 	ca/db/%.txt \
 	ca/db/%.txt.attr \
+	ca/refs/%/serial \
 	ca/private/%.key \
 	ca/private/%.pwd \
 	ca/reqs/%.csr \
@@ -263,7 +264,10 @@ ca/private/%.pwd: | ca/private/
 ca/ ca/certs/ pub/:
 	@install -d -m 755 $@
 
-ca/db/ ca/new/ ca/private/ ca/reqs/: | ca/
+ca/db/ ca/new/ ca/private/ ca/refs/ ca/reqs/: | ca/
+	@install -d -m 700 $@
+
+ca/refs/%/: | ca/refs/
 	@install -d -m 700 $@
 
 archive/ dist/:
@@ -331,6 +335,11 @@ dist/%/certificate.pem: \
 		-extensions $(sct)_ext \
 		-passin file:ca/private/$(sca).pwd
 
+# Store the issued certificate serial for revocation without dist artifacts.
+ca/refs/%/serial: dist/%/certificate.pem | ca/refs/%/
+	@$(OPENSSL) x509 -in $< -noout -serial | sed 's/^serial=//' > $@
+	@chmod 600 $@
+
 # Create a PKCS#12 bundle with key, certificate, and CA chain.
 dist/%/bundle.p12: \
 	dist/%/key.pem \
@@ -364,6 +373,7 @@ dist/%/certificate.txt: dist/%/certificate.pem
 $(CERTS): certs/%: \
 	dist/%/request.csr \
 	dist/%/certificate.pem \
+	ca/refs/%/serial \
 	dist/%/fullchain.pem \
 	dist/%/certificate.der \
 	dist/%/certificate.txt
@@ -404,7 +414,7 @@ renew-action/%: archive/%
 revoke-action/%: archive/%
 	@$(OPENSSL) ca -batch \
 		-config etc/$(sca).cnf \
-		-revoke dist/$*/certificate.pem \
+		-revoke ca/new/$$(cat ca/refs/$*/serial).pem \
 		-passin file:ca/private/$(sca).pwd \
 		-crl_reason $(REASON)
 	@rm -rf dist/$*/
