@@ -2,155 +2,375 @@
 
 ![GitHub License](https://img.shields.io/github/license/jomrr/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjomrr%2Fmake-ca%2Fblob%2Fmain%2FLICENSE) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/jomrr/make-ca?style=for-the-badge&color=blue&link=https%3A%2F%2Fgithub.com%2Fjomrr%2Fmake-ca%2Fissues)
 
-Makefile for creating and managing a 3-tier certificate authority.
+`make-ca` is a Makefile-based OpenSSL CA helper for creating and operating a small 3-tier certificate authority.
 
 > This is not meant for production use, but because I can.
 >
-> The passwords for the CA keys are stored on disk.
+> CA private key passphrases are stored on disk.
 
-## Getting started
+## Overview
 
-The `make-ca` project is a Makefile-based tool for creating and managing a 3-tier certificate authority. It provides a simple and automated way to generate and manage Certificates amd CRLs for various purposes.
-The directory structure is simplified for a centralized use case, where one operator manages the CAs.
+The project manages a simple CA hierarchy and end-entity certificates through GNU Make targets.
 
-### Directory Structure
+The default hierarchy is:
 
-| level 0 | level 1 | level 2 | description |
-| ------- | ------- | ------- | ----------- |
-| **name** | | | base dir of the ca, e.g. `example` for Example CA |
-| | archive | | renewed and revoked certificates are archived here by ID and timestamp |
-| | ca | | CA specific data |
-| | | certs | CA certificates go here |
-| | | db | CA database and serial files are located here |
-| | | new | new issued certificates named by serial no. |
-| | | private | private keys of CAs |
-| | | reqs | CSRs of the CA certificates |
-| | dist  | | issued certificates and keys from signing CAs |
-| | etc | | openssl configuration files for CAs |
-| | | component-ca | template cnf extension subfolders for Component CA |
-| | | identity-ca | template cnf and extension subfolders for Identity CA |
-| | pub | | public/web distribution folder with CA certs, chains, CRLs |
+```text
+root-ca
+└── intermediate-ca
+    ├── component-ca
+    └── identity-ca
+```
 
-The following headlines describe the CA structure.
+The repository is optimized for a centralized use case where one operator manages the CA state, OpenSSL configuration files, public CA artifacts, and generated certificate distribution artifacts.
+
+## CA hierarchy
 
 ### Root CA
 
-The Root CA of the 3-tier setup, configured in `etc/root-ca.cnf`.
+The Root CA is configured in:
 
-Issues:
+```text
+etc/root-ca.cnf
+```
+
+It issues:
 
 - Intermediate CA certificates
 - Root CA CRL
 
-#### Intermediate CA
+### Intermediate CA
 
-The Intermedite CA of the 3-tier setup, configured in `etc/intermediate-ca.cnf`.
+The Intermediate CA is configured in:
 
-Issues:
+```text
+etc/intermediate-ca.cnf
+```
 
-- Signing CA certificates (`pub/*[-chain].{der,pem,txt}`)
-- Intermediate CA CRL (`pub/intermediate-ca.{crl,crl.pem}`)
+It issues:
 
-##### Identity CA
+- Signing / issuing CA certificates
+- Intermediate CA CRL
 
-The Identity CA (a Signing CA), configured in `etc/identity-ca.cnf`.
+### Component CA
 
-Issues:
+The Component CA is configured in:
 
-- `smime`: S/MIME Certificates for mail signature end encryption (`dist/*[-fullchain].{der,pem,txt}`)
-- Identity CA CRL (`pub/identity-ca.{crl,crl.pem}`)
+```text
+etc/component-ca.cnf
+```
 
-##### Component CA
+It issues certificates for technical components and services.
 
-The Component CA (a Signing CA), configured in `etc/component-ca.cnf`.
+Configured certificate classes include:
 
-Issues:
+| Class | Purpose |
+|---|---|
+| `client` | TLS client certificates |
+| `server` | TLS server certificates |
+| `ocsp` | OCSP signing certificates |
+| `timestamp` | Timestamp signing certificates |
 
-- `client`: TLS Client certificates (`dist/*[-fullchain].{der,pem,txt}`)
-- `server`: TLS Server certificates (`dist/*[-fullchain].{der,pem,txt}`)
-- `ocsp`: OCSP siging
-- `timestamp` Timestamp signing
-- Component CA CRL  (`pub/component-ca.{crl,crl.pem}`)
+### Identity CA
+
+The Identity CA is configured in:
+
+```text
+etc/identity-ca.cnf
+```
+
+It issues identity-related certificates.
+
+Configured certificate classes include:
+
+| Class | Purpose |
+|---|---|
+| `smime` | S/MIME certificates for mail signing and encryption |
+
+## State model
+
+The project separates authoritative CA state from generated distribution artifacts.
+
+| Directory | Purpose | Authoritative |
+|---|---|---:|
+| `ca/` | CA state, CA private keys, CA database, CA certificates | Yes |
+| `ca/db/` | OpenSSL CA index, serial, CRL number, and attributes | Yes |
+| `ca/new/` | OpenSSL-issued certificates named by serial number | Yes |
+| `ca/private/` | CA private keys and passphrase files | Yes |
+| `ca/certs/` | CA certificates | Yes |
+| `ca/reqs/` | CA certificate signing requests | Yes |
+| `pub/` | Public CA certificates, chains, and CRLs | No |
+| `dist/` | Generated end-entity certificate artifacts | No |
+| `archive/` | Optional timestamped snapshots before renewal/revocation | No |
+| `etc/` | OpenSSL configuration files | Yes |
+
+`dist/` is an operational export area, not authoritative CA state.
+
+Current renewal and revocation targets use the exported certificate in `dist/<CA>/<CERT_TYPE>/<ID>/certificate.pem` as revocation input. This is a known implementation limitation. The canonical issued certificate copies are stored by OpenSSL in `ca/new/` using serial-number-based filenames.
+
+## Directory structure
+
+```text
+.
+├── archive/
+├── ca/
+│   ├── certs/
+│   ├── db/
+│   ├── new/
+│   ├── private/
+│   └── reqs/
+├── dist/
+│   └── <CA>/
+│       └── <CERT_TYPE>/
+│           └── <ID>/
+│               ├── bundle.p12
+│               ├── certificate.der
+│               ├── certificate.pem
+│               ├── certificate.txt
+│               ├── fullchain.pem
+│               ├── key.pem
+│               └── request.csr
+├── etc/
+│   ├── root-ca.cnf
+│   ├── intermediate-ca.cnf
+│   ├── component-ca.cnf
+│   ├── identity-ca.cnf
+│   ├── component-ca/
+│   │   ├── client/
+│   │   ├── server/
+│   │   ├── ocsp/
+│   │   └── timestamp/
+│   └── identity-ca/
+│       └── smime/
+└── pub/
+```
+
+## Generated certificate artifacts
+
+For an end-entity certificate target such as:
+
+```text
+certs/component-ca/server/test.example.com
+```
+
+the generated artifacts are stored in:
+
+```text
+dist/component-ca/server/test.example.com/
+```
+
+| File | Purpose |
+|---|---|
+| `key.pem` | End-entity private key |
+| `request.csr` | Certificate signing request |
+| `certificate.pem` | Issued certificate in PEM format |
+| `certificate.der` | Issued certificate in DER format |
+| `certificate.txt` | Text representation of the issued certificate |
+| `fullchain.pem` | Issued certificate plus CA chain |
+| `bundle.p12` | PKCS#12 bundle with private key, certificate, and CA chain |
+
+## Configuration
+
+General defaults are configured in:
+
+```text
+settings.mk
+```
+
+Important settings include:
+
+| Variable | Purpose |
+|---|---|
+| `ROOT_CA` | Root CA slug |
+| `SIGNING_CA` | Intermediate CA slug |
+| `ISSUING_CA` | Issuing CA slugs |
+| `ALL_CA` | Complete CA list |
+| `BASE_URL` | Base URL for AIA and CDP references |
+| `DN_C` | Default subject country |
+| `DN_ST` | Default subject state |
+| `DN_L` | Default subject locality |
+| `DN_O` | Default subject organization |
+| `DN_OU` | Default subject organizational unit |
+| `DEFAULT_BITS` | Default RSA key length |
+| `DEFAULT_MD` | Default message digest |
+| `CAK_ALG` | CA private key algorithm |
+| `CPK_ALG` | End-entity private key algorithm |
+| `REASON` | Default revocation reason |
 
 ## Installation
 
-To install `make-ca`, follow these steps:
-
-1. Clone the repository: `git clone https://github.com/jomrr/make-ca.git /etc/pki/tls/ca/<your name>`
-2. Change into the project directory: `cd /etc/pki/tls/ca/<your name>`
-3. Customize `settings.mk` to your needs
-4. Initialize the CAs wit the command: `make init`
-
-## Usage Examples
-
-Here are a few examples how to use `make-ca`.
-
-### Create TLS Server certificate with subjectAltNames
+Clone the repository into the desired CA working directory:
 
 ```bash
-# copy template etc/<CA>/<CERT_TYPE/X509 Extension>/<ID>.cnf
-cp etc/component-ca/server.cnf etc/component-ca/server/test.example.com.cnf
-# customize CSR data
+git clone https://github.com/jomrr/make-ca.git /etc/pki/tls/ca/<name>
+cd /etc/pki/tls/ca/<name>
+```
+
+Adjust the project settings:
+
+```bash
+nvim settings.mk
+```
+
+Initialize the CA hierarchy:
+
+```bash
+make init
+```
+
+## Targets
+
+### General targets
+
+| Target | Purpose |
+|---|---|
+| `make help` | Show usage information |
+| `make init` | Initialize configured CAs and generate CRLs when required |
+| `make crls` | Generate CRLs when required |
+| `make print` | Print compact CA database records |
+| `make print-full` | Print CA database records with full serials and subjects |
+
+### Cleanup targets
+
+| Target | Purpose |
+|---|---|
+| `make clean` | Delete derived export artifacts while keeping keys, CSRs, and certificates |
+| `make distclean` | Delete all generated end-entity distribution artifacts |
+| `make destroy` | Delete runtime state directories with interactive confirmation |
+| `make mrproper` | Delete runtime state directories without confirmation |
+
+`clean` does not remove private keys, CSRs, or issued certificate exports.
+
+### Certificate targets
+
+| Target | Purpose |
+|---|---|
+| `make certs/<CA>/<CERT_TYPE>/<ID>` | Create standard certificate artifacts |
+| `make p12/<CA>/<CERT_TYPE>/<ID>` | Create a PKCS#12 bundle |
+| `make renew/<CA>/<CERT_TYPE>/<ID>` | Renew a certificate using the existing private key |
+| `make revoke/<CA>/<CERT_TYPE>/<ID>` | Revoke a certificate |
+
+The certificate configuration file must exist at:
+
+```text
+etc/<CA>/<CERT_TYPE>/<ID>.cnf
+```
+
+## Usage examples
+
+### Create a TLS server certificate
+
+Copy or create a certificate configuration:
+
+```bash
+cp etc/component-ca/server/example.cnf \
+  etc/component-ca/server/test.example.com.cnf
+```
+
+Edit the request configuration:
+
+```bash
 nvim etc/component-ca/server/test.example.com.cnf
-# issue certificate
+```
+
+Issue the certificate:
+
+```bash
 make certs/component-ca/server/test.example.com
 ```
 
-### Revoke TLS Server certificate
+Generated artifacts are written to:
 
-Use the CA specific target to revoke, in this case `make revoke/*`.
+```text
+dist/component-ca/server/test.example.com/
+```
+
+### Create a PKCS#12 bundle
+
+```bash
+make p12/component-ca/server/test.example.com
+```
+
+The bundle is written to:
+
+```text
+dist/component-ca/server/test.example.com/bundle.p12
+```
+
+### Renew a TLS server certificate
+
+```bash
+make renew/component-ca/server/test.example.com
+```
+
+Renewal revokes the current certificate with reason `superseded`, removes generated certificate artifacts, and rebuilds the certificate using the existing private key.
+
+### Revoke a TLS server certificate
 
 ```bash
 make revoke/component-ca/server/test.example.com REASON=superseded
 ```
 
-### Create Ed25519 TLS Server certificate
+If `REASON` is omitted, `superseded` is used as the default revocation reason.
+
+Supported revocation reasons depend on OpenSSL and RFC 5280 semantics. Common values include:
+
+| Reason | Meaning |
+|---|---|
+| `unspecified` | No specific reason |
+| `keyCompromise` | End-entity private key was compromised |
+| `cACompromise` | CA private key was compromised |
+| `affiliationChanged` | Subject affiliation changed |
+| `superseded` | Replacement certificate was issued |
+| `cessationOfOperation` | Certificate is no longer needed |
+| `certificateHold` | Temporary hold |
+| `removeFromCRL` | Remove a held certificate from the CRL |
+| `privilegeWithdrawn` | Privileges were withdrawn |
+| `aACompromise` | Attribute authority was compromised |
+
+### Create an Ed25519 TLS server certificate
 
 ```bash
 CPK_ALG=ED25519 make certs/component-ca/server/test.example.com
-
-# example output:
-Signature ok
-Certificate Details:
-        Serial Number:
-            61:3b:bc:01:8b:c1:34:99:db:1b:b2:e3:8a:0c:77:fa:64:6e:bd:0c
-        Validity
-            Not Before: Feb 24 21:25:10 2024 GMT
-            Not After : Feb 23 21:25:10 2026 GMT
-        Subject:
-            countryName               = DE
-            stateOrProvinceName       = Bayern
-            localityName              = Strunzenoed
-            organizationName          = Example
-            organizationalUnitName    = Example PKI
-            commonName                = test.example.com
-        X509v3 extensions:
-            X509v3 Key Usage: critical
-                Digital Signature, Key Encipherment
-            X509v3 Extended Key Usage: 
-                TLS Web Client Authentication, TLS Web Server Authentication
-            X509v3 Subject Key Identifier: 
-                42:BE:22:33:44:CF:72:02:58:EB:EF:88:4B:BA:1C:10:B6:AA:DB:C8
-            X509v3 Authority Key Identifier: 
-                FE:80:D7:E5:6D:27:9E:85:18:13:99:E5:79:B4:9E:CB:FA:42:21:F4
-            Authority Information Access: 
-                CA Issuers - URI:http://pki.example.com/component-ca.cer
-                OCSP - URI:http://ocsp.example.com/component
-            X509v3 CRL Distribution Points: 
-                Full Name:
-                  URI:http://pki.example.com/component-ca.crl
-            X509v3 Subject Alternative Name: 
-                DNS:test.example.com
-Certificate is to be certified until Feb 23 21:25:10 2026 GMT (730 days)
-
-Write out database with 1 new entries
-Data Base Updated
 ```
+
+## Operational notes
+
+### CA private keys
+
+CA private keys are encrypted with passphrases generated by OpenSSL. The passphrases are stored in:
+
+```text
+ca/private/*.pwd
+```
+
+This is convenient for lab and local automation use, but it is not appropriate for a production CA without additional controls.
+
+### Offline Root CA
+
+The default workflow does not implement a strict offline Root CA model yet.
+
+For an offline Root CA workflow, Root CA private key material should not be present on the online issuing host. The online host should only contain the public Root CA certificate, public chains, CRLs, and the CA material required for online issuing CAs.
+
+This requires additional operational separation and is not fully enforced by the current Makefile.
+
+### Current limitations
+
+The current implementation has the following known limitations:
+
+- The CA hierarchy is still modeled as a fixed 3-tier setup.
+- Renewal and revocation currently require the exported certificate in `dist/`.
+- CA parent relationships are not yet modeled generically in `settings.mk`.
+- Offline Root CA operation is documented conceptually but not enforced.
+- CRL generation is Make-target based and not a forced refresh unless dependencies require it.
 
 ## License
 
 This project is licensed under the [MIT License](https://github.com/jomrr/make-ca/blob/main/LICENSE).
 
-## Author(s)
+## Copyright
 
-- @jomrr (2022)
+Copyright © 2022-2026 Jonas Mauer
+
+## Maintainer
+
+- @jomrr

@@ -70,8 +70,7 @@ arc = $(subst /,-,$*)
 	dist/%/certificate.pem \
 	dist/%/certificate.txt \
 	dist/%/fullchain.pem \
-	dist/%/private.key \
-	dist/%/private.pwd \
+	dist/%/key.pem \
 	dist/%/request.csr
 
 # CA state and public CA artifacts must not be deleted by make.
@@ -302,18 +301,18 @@ test:
 .SECONDEXPANSION:
 
 # Create an end-entity private key.
-dist/%/private.key: | dist/%/
+dist/%/key.pem: | dist/%/
 	@umask 077; $(OPENSSL) genpkey -out $@ -algorithm $(CPK_ALG)
 	@chmod 600 $@
 
 # Create a certificate signing request from key and request config.
 dist/%/request.csr: \
-	dist/%/private.key \
+	dist/%/key.pem \
 	etc/$$(sca)/$$(sct)/$$(sid).cnf \
 	| dist/%/
 	@$(OPENSSL) req -batch -new \
 		-config etc/$(sca)/$(sct)/$(sid).cnf \
-		-key dist/$*/private.key \
+		-key dist/$*/key.pem \
 		-out $@ \
 		-outform PEM
 
@@ -334,7 +333,7 @@ dist/%/certificate.pem: \
 
 # Create a PKCS#12 bundle with key, certificate, and CA chain.
 dist/%/bundle.p12: \
-	dist/%/private.key \
+	dist/%/key.pem \
 	dist/%/certificate.pem \
 	pub/$$(sca)-chain.pem \
 	| dist/%/
