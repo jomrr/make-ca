@@ -2,39 +2,79 @@
 # file: Makefile
 
 # =============================================================================
-# Makefile for operating an openssl certificate authority
+# Makefile for operating an OpenSSL certificate authority
 # =============================================================================
 
-MAKEFLAGS	+= --no-builtin-rules
-MAKEFLAGS	+= --warn-undefined-variables
+MAKEFLAGS += --no-builtin-rules
+MAKEFLAGS += --warn-undefined-variables
 
-# parallel execution is too risky for openssl CA operations
+# Parallel execution is unsafe for OpenSSL CA database operations.
 .NOTPARALLEL:
 
-# shell to use
-SHELL		:= /bin/bash
-.SHELLFLAGS	:= -euo pipefail -c
+SHELL := /bin/bash
+.SHELLFLAGS := -euo pipefail -c
 
-.DEFAULT_GOAL	:= help
+.DEFAULT_GOAL := help
 
-# openssl binary
-OPENSSL		:= /usr/bin/openssl
+OPENSSL := /usr/bin/openssl
 
-# destroy directories
-DESTROY		:= archive/ ca/ dist/ pub/
+# Runtime state directories removed by destructive cleanup targets.
+DESTROY := archive/ ca/ dist/ pub/
 
-# ca default settings
-include		settings.mk
-# variables for dynamic targets
-include 	targets.mk
+# -----------------------------------------------------------------------------
+# Project settings and generated target lists
+# -----------------------------------------------------------------------------
 
-# dist per ca and cert type for easier management of artifacts
-DIST_BASE	:= dist/$(CA)/$(CERT_TYPE)
+include settings.mk
 
-# do not treat as intermediate targets, to prevent deletion
-.NOTINTERMEDIATE: dist/%/ $(DIST_BASE)/%/
+# Timestamp used for archive file names.
+DATETIME := $(shell date +%Y-%m-%dT%H:%M:%S%z)
 
-# keep these files
+# Static certificate request configuration files.
+CONFIGS := $(sort $(wildcard etc/*/*/*.cnf))
+CERT_SPECS := $(patsubst etc/%.cnf,%,$(CONFIGS))
+
+# Explicit targets are kept for shell and make completion.
+CERTS := $(addprefix certs/,$(CERT_SPECS))
+P12S := $(addprefix p12/,$(CERT_SPECS))
+RENEWS := $(addprefix renew/,$(CERT_SPECS))
+REVOKES := $(addprefix revoke/,$(CERT_SPECS))
+
+# -----------------------------------------------------------------------------
+# Internal helper functions
+# -----------------------------------------------------------------------------
+
+emp :=
+spc := $(emp) $(emp)
+
+# stem part
+prt = $(word $(1),$(subst /,$(spc),$(2)))
+# stem ca
+sca = $(call prt,1,$(1))
+# stem cert type
+sct = $(call prt,2,$(1))
+# stem id
+sid = $(call prt,3,$(1))
+# stem archive
+arc = $(subst /,-,$(1))
+
+# -----------------------------------------------------------------------------
+# Special make behavior
+# -----------------------------------------------------------------------------
+
+# Generated dist artifacts are persistent build outputs, not intermediates.
+.NOTINTERMEDIATE: \
+	dist/%/ \
+	dist/%/bundle.p12 \
+	dist/%/certificate.der \
+	dist/%/certificate.pem \
+	dist/%/certificate.txt \
+	dist/%/fullchain.pem \
+	dist/%/private.key \
+	dist/%/private.pwd \
+	dist/%/request.csr
+
+# CA state and public CA artifacts must not be deleted by make.
 .PRECIOUS: \
 	ca/certs/%.pem \
 	ca/db/%.crlnumber \
@@ -44,14 +84,6 @@ DIST_BASE	:= dist/$(CA)/$(CERT_TYPE)
 	ca/private/%.key \
 	ca/private/%.pwd \
 	ca/reqs/%.csr \
-	$(DIST_BASE)/%/bundle.p12 \
-	$(DIST_BASE)/%/certificate.der \
-	$(DIST_BASE)/%/certificate.pem \
-	$(DIST_BASE)/%/certificate.txt \
-	$(DIST_BASE)/%/fullchain.pem \
-	$(DIST_BASE)/%/private.key \
-	$(DIST_BASE)/%/private.pwd \
-	$(DIST_BASE)/%/request.csr \
 	etc/%.cnf \
 	pub/%.der \
 	pub/%.pem \
@@ -59,192 +91,175 @@ DIST_BASE	:= dist/$(CA)/$(CERT_TYPE)
 	pub/%-chain.der \
 	pub/%-chain.pem
 
-# ******************************************************************************
-# make targets start here
-# ******************************************************************************
+# =============================================================================
+# User-facing targets
+# =============================================================================
 
 .PHONY: help
 help:
 	@printf '%s\n' "Usage: make [target] [CPK_ALG=algorithm]"
-	@printf '%s\n' "       make certs/*  Create certs from static conf"
-	@printf '%s\n' "       make renew/*  Renew certs from static conf"
-	@printf '%s\n\n' "       make revoke/* [REASON=<default=superseded>]"
-	@printf '%s\n' "Static conf provided by etc/<CA>/<CERT_TYPE>/<ID>.cnf"
+	@printf '%s\n' "       make certs/*   Create certs from static config"
+	@printf '%s\n' "       make p12/*     Create PKCS#12 bundles"
+	@printf '%s\n' "       make renew/*   Renew certs from static config"
+	@printf '%s\n\n' "       make revoke/*  Revoke certs"
+	@printf '%s\n' "Static config path: etc/<CA>/<CERT_TYPE>/<ID>.cnf"
 	@printf '%s\n' "Default values are defined in settings.mk"
 
 .PHONY: all
 all: init
 
-# delete CSRs in dist/
+# Delete derived export artifacts while keeping keys, CSRs, and certificates.
 .PHONY: clean
 clean:
-	@test ! -d dist || find dist -type f -name request.csr -delete
+	@test ! -d dist || find dist -type f \
+		\( -name bundle.p12 \
+		-o -name certificate.der \
+		-o -name certificate.txt \
+		-o -name fullchain.pem \) -delete
 
-# delete dist/
+# Delete generated end-entity certificate artifacts.
 .PHONY: distclean
 distclean:
 	@rm -rf dist/
 
-# delete everything but make and the config dir
+# Delete runtime state directories with interactive confirmation.
 .PHONY: destroy
 destroy:
 	@rm -Ir $(DESTROY)
 
-# destroy everything without asking
+# Delete runtime state directories without confirmation.
 .PHONY: force-destroy mrproper
 force-destroy mrproper:
 	@rm -rf $(DESTROY)
 
-# init all CAs and generate initial CRLs
+# Initialize all configured CAs and generate CRLs when required.
 .PHONY: init crls
 init crls: $(foreach ca,$(ALL_CA),pub/$(ca).crl)
 
-# print CA db files with CA name for grepping serials, revoked, etc.
+# Print CA database records in compact format.
 .PHONY: print
 print:
 	@bin/print ca/db
 
+# Print CA database records with full serials and subjects.
 .PHONY: print-full
 print-full:
 	@bin/print --full ca/db
 
-# create Private KEY
-$(DIST_BASE)/%/private.key: | $(DIST_BASE)/%/
-	@umask 077; $(OPENSSL) genpkey -out $@ -algorithm $(CPK_ALG)
-	@chmod 600 $@
+# =============================================================================
+# Public CA artifacts and revocation lists
+# =============================================================================
 
-# create CSR, config is selected by calling target
-$(DIST_BASE)/%/request.csr: $(DIST_BASE)/%/private.key etc/$(CA)/$(CERT_TYPE)/%.cnf | $(DIST_BASE)/%/
-	@$(OPENSSL) req -batch -new -config etc/$(CA)/$(CERT_TYPE)/$*.cnf -key $(DIST_BASE)/$*/private.key -out $@ -outform PEM
-
-# issue PEM certificate from CSR
-$(DIST_BASE)/%/certificate.pem: $(DIST_BASE)/%/request.csr etc/$(CA).cnf ca/certs/$(CA).pem ca/private/$(CA).key ca/private/$(CA).pwd | $(DIST_BASE)/%/
-	@$(OPENSSL) ca -batch -notext -create_serial -config etc/$(CA).cnf -in $< -out $@ -extensions $(CERT_TYPE)_ext -passin file:ca/private/$(CA).pwd
-
-# create pkcs12 bundle with key, crt and ca-chain
-$(DIST_BASE)/%/bundle.p12: $(DIST_BASE)/%/private.key $(DIST_BASE)/%/certificate.pem pub/$(CA)-chain.pem | $(DIST_BASE)/%/
-	@umask 077; $(OPENSSL) pkcs12 -export -name "$*" -inkey $< -in $(DIST_BASE)/$*/certificate.pem -certfile pub/$(CA)-chain.pem -out $@
-	@chmod 600 $@
-
-# create pem bundle with crt and ca-chain
-$(DIST_BASE)/%/fullchain.pem: $(DIST_BASE)/%/certificate.pem pub/$(CA)-chain.pem
-	@cat $< pub/$(CA)-chain.pem > $@
-
-# export certificate in DER format
-$(DIST_BASE)/%/certificate.der: $(DIST_BASE)/%/certificate.pem
-	@$(OPENSSL) x509 -in $< -out $@ -outform DER
-
-# export certificate in txt format
-$(DIST_BASE)/%/certificate.txt: $(DIST_BASE)/%/certificate.pem
-	@$(OPENSSL) x509 -in $< -text -noout > $@
-
-# dynamic target for certificate generation
-.PHONY: $(CERTS)
-$(CERTS): certs/$(CA)/$(CERT_TYPE)/%: $(DIST_BASE)/%/request.csr $(DIST_BASE)/%/certificate.pem $(DIST_BASE)/%/fullchain.pem $(DIST_BASE)/%/certificate.der $(DIST_BASE)/%/certificate.txt
-	@echo "CERT: $@"
-	@ls -la $(DIST_BASE)/$*/
-
-# dynamic target for p12 bundle generation
-.PHONY: $(P12S)
-$(P12S): p12/$(CA)/$(CERT_TYPE)/%: $(DIST_BASE)/%/bundle.p12
-	@echo "P12: $@"
-	@ls -la $(DIST_BASE)/$*/bundle.p12
-
-# dynamic target for certificate renewal
-.PHONY: $(RENEWS)
-$(RENEWS): renew/$(CA)/$(CERT_TYPE)/%: renew-% $(DIST_BASE)/%/certificate.txt pub/$(CA).crl
-	@echo "RENEW: $@"
-	@ls -la $(DIST_BASE)/$*/
-
-# dynamic target for certificate revocation
-.PHONY: $(REVOKES)
-$(REVOKES): revoke/$(CA)/$(CERT_TYPE)/%: revoke-% pub/$(CA).crl
-	@echo "REVOKE: $@"
-	@ls -la archive/$(CA)-$(CERT_TYPE)-$*.*
-
-# renew a certificate with existing key
-.PHONY: renew-%
-renew-%: archive-%
-	@$(OPENSSL) ca -batch -config etc/$(CA).cnf -revoke $(DIST_BASE)/$*/certificate.pem -passin file:ca/private/$(CA).pwd -crl_reason superseded
-	@rm -f $(DIST_BASE)/$*/*.{csr,der,pem,p12,txt}
-
-# revoke a certificate
-.PHONY: revoke-%
-revoke-%: archive-%
-	@$(OPENSSL) ca -batch -config etc/$(CA).cnf -revoke $(DIST_BASE)/$*/certificate.pem -passin file:ca/private/$(CA).pwd -crl_reason $(REASON)
-	@rm -rf $(DIST_BASE)/$*/
-
-# create archive of certificate artifacts
-.PHONY: archive-%
-archive-%: | archive/
-	@test -f $(DIST_BASE)/$*/certificate.pem || { echo "error: missing $(DIST_BASE)/$*/certificate.pem" >&2; exit 2; }
-	@tar -czvf "archive/$(CA)-$(CERT_TYPE)-$*.$(DATETIME).tar.gz" $(DIST_BASE)/$*/
-
-# generate CRL for CAs and initialize if needed
+# Generate a DER encoded CRL for a CA.
 pub/%.crl: pub/%-chain.der ca/db/%.txt | ca/db/%.crlnumber pub/
-	@$(OPENSSL) ca -gencrl -config etc/$*.cnf -passin file:ca/private/$*.pwd -out pub/$*.crl.pem
-	@$(OPENSSL) crl -in "pub/$*.crl.pem" -out $@ -outform DER
+	@$(OPENSSL) ca -gencrl -config etc/$*.cnf \
+		-passin file:ca/private/$*.pwd \
+		-out pub/$*.crl.pem
+	@$(OPENSSL) crl -in pub/$*.crl.pem -out $@ -outform DER
 
+# Export a PEM chain as DER for systems that require DER CA artifacts.
 pub/%-chain.der: pub/%-chain.pem | pub/
 	@$(OPENSSL) x509 -in $< -out $@ -outform DER
 
+# Create the root CA chain.
 pub/root-ca-chain.pem: pub/%-chain.pem: pub/%.txt | pub/
 	@cat pub/root-ca.pem > $@
 
+# Create the intermediate CA chain.
 pub/intermediate-ca-chain.pem: pub/%-chain.pem: pub/%.pem pub/%.txt | pub/
 	@cat $< pub/root-ca.pem > $@
 
-# create PEM certificate chain for issuing ca
+# Create the issuing CA chain.
 pub/%-chain.pem: pub/%.pem pub/%.txt | pub/
 	@cat $< pub/intermediate-ca.pem pub/root-ca.pem > $@
 
+# Export a CA certificate in text format.
 pub/%.txt: pub/%.der | pub/
 	@$(OPENSSL) x509 -in $< -text -noout > $@
 
-# create DER export of ca certificate
+# Export a CA certificate in DER format.
 pub/%.der: pub/%.pem | pub/
 	@$(OPENSSL) x509 -in $< -out $@ -outform DER
 
-# export ca certificate in PEM format. it already should be.
+# Export a CA certificate in PEM format.
 pub/%.pem: ca/certs/%.pem | pub/
 	@$(OPENSSL) x509 -in $< -out $@ -outform PEM
 
-# generate root ca certificate
-ca/certs/root-ca.pem: ca/certs/%.pem: ca/reqs/%.csr | ca/db/%.txt ca/certs/ ca/new/
-	@$(OPENSSL) ca -batch -notext -create_serial -config etc/$*.cnf -passin file:ca/private/$*.pwd -selfsign -in $< -out $@
+# =============================================================================
+# CA certificate hierarchy
+# =============================================================================
 
-# generate intermediate ca certificate
-ca/certs/intermediate-ca.pem: ca/certs/%.pem: ca/reqs/%.csr ca/certs/root-ca.pem | ca/db/%.txt ca/certs/ ca/new/
-	@$(OPENSSL) ca -batch -notext -create_serial -config etc/root-ca.cnf -keyfile ca/private/root-ca.key -passin file:ca/private/root-ca.pwd -in $< -out $@
+# Generate the self-signed root CA certificate.
+ca/certs/root-ca.pem: ca/certs/%.pem: ca/reqs/%.csr \
+	| ca/db/%.txt ca/certs/ ca/new/
+	@$(OPENSSL) ca -batch -notext -create_serial \
+		-config etc/$*.cnf \
+		-passin file:ca/private/$*.pwd \
+		-selfsign \
+		-in $< \
+		-out $@
 
-# generate issuing ca certificates
-ca/certs/%.pem: ca/reqs/%.csr ca/certs/intermediate-ca.pem | ca/db/%.txt ca/certs/ ca/new/
-	@$(OPENSSL) ca -batch -notext -create_serial -config etc/intermediate-ca.cnf -keyfile ca/private/intermediate-ca.key -passin file:ca/private/intermediate-ca.pwd -in $< -out $@
+# Generate the intermediate CA certificate signed by the root CA.
+ca/certs/intermediate-ca.pem: ca/certs/%.pem: ca/reqs/%.csr \
+	ca/certs/root-ca.pem \
+	| ca/db/%.txt ca/certs/ ca/new/
+	@$(OPENSSL) ca -batch -notext -create_serial \
+		-config etc/root-ca.cnf \
+		-keyfile ca/private/root-ca.key \
+		-passin file:ca/private/root-ca.pwd \
+		-in $< \
+		-out $@
 
-# create ca certificate signing request
+# Generate issuing CA certificates signed by the intermediate CA.
+ca/certs/%.pem: ca/reqs/%.csr ca/certs/intermediate-ca.pem \
+	| ca/db/%.txt ca/certs/ ca/new/
+	@$(OPENSSL) ca -batch -notext -create_serial \
+		-config etc/intermediate-ca.cnf \
+		-keyfile ca/private/intermediate-ca.key \
+		-passin file:ca/private/intermediate-ca.pwd \
+		-in $< \
+		-out $@
+
+# Create a CA certificate signing request.
 ca/reqs/%.csr: ca/private/%.key ca/private/%.pwd etc/%.cnf | ca/reqs/
-	@$(OPENSSL) req -batch -new -config etc/$*.cnf -key $< -passin file:ca/private/$*.pwd -out $@ -outform PEM
+	@$(OPENSSL) req -batch -new \
+		-config etc/$*.cnf \
+		-key $< \
+		-passin file:ca/private/$*.pwd \
+		-out $@ \
+		-outform PEM
 
-# create ca private key
+# Create an encrypted CA private key.
 ca/private/%.key: | ca/private/%.pwd
-	@umask 077; $(OPENSSL) genpkey -out $@ -algorithm $(CAK_ALG) -aes256 -pass file:ca/private/$*.pwd
+	@umask 077; $(OPENSSL) genpkey \
+		-out $@ \
+		-algorithm $(CAK_ALG) \
+		-aes256 \
+		-pass file:ca/private/$*.pwd
 	@chmod 600 $@
 
+# Create a CRL number file.
 ca/db/%.crlnumber: | ca/db/
 	@install -m 600 /dev/null $@
 	@echo 01 > $@
 
+# Create an OpenSSL CA database file.
 ca/db/%.txt: | ca/db/%.txt.attr
 	@install -m 600 /dev/null $@
 
+# Create OpenSSL CA database attributes.
 ca/db/%.txt.attr: | ca/db/
 	@install -m 600 /dev/null $@
 	@echo "unique_subject = no" > $@
 
-# create password for encrypted private keys
+# Create a password file for encrypted CA private keys.
 ca/private/%.pwd: | ca/private/
 	@umask 077; $(OPENSSL) rand -hex 64 > $@
 	@chmod 600 $@
+
+# =============================================================================
+# Directory targets
+# =============================================================================
 
 ca/ ca/certs/ pub/:
 	@install -d -m 755 $@
@@ -258,7 +273,10 @@ archive/ dist/:
 dist/%/: | dist/
 	@install -d -m 700 $@
 
-# basic tests
+# =============================================================================
+# Test targets
+# =============================================================================
+
 .PHONY: test-vars
 test-vars:
 	@echo "CAK_ALG: $(CAK_ALG)"
@@ -270,6 +288,129 @@ test:
 	$(MAKE) init 1>/dev/null
 	$(MAKE) crls 1>/dev/null
 	$(MAKE) certs/component-ca/server/fritzbox 1>/dev/null
-	$(MAKE) revoke/component-ca/server/fritzbox REASON=superseded 1>/dev/null
+	$(MAKE) revoke/component-ca/server/fritzbox 1>/dev/null
 	$(MAKE) crls 1>/dev/null
 	$(MAKE) mrproper 1>/dev/null
+
+# =============================================================================
+# Dynamic end-entity certificate targets
+# =============================================================================
+
+# These rules derive prerequisites from the target stem:
+# <CA>/<CERT_TYPE>/<ID>. Second expansion is intentionally limited to this
+# final block.
+.SECONDEXPANSION:
+
+# Create an end-entity private key.
+dist/%/private.key: | dist/%/
+	@umask 077; $(OPENSSL) genpkey -out $@ -algorithm $(CPK_ALG)
+	@chmod 600 $@
+
+# Create a certificate signing request from key and request config.
+dist/%/request.csr: \
+	dist/%/private.key \
+	etc/$$(call sca,$$*)/$$(call sct,$$*)/$$(call sid,$$*).cnf \
+	| dist/%/
+	@$(OPENSSL) req -batch -new \
+		-config etc/$(call sca,$*)/$(call sct,$*)/$(call sid,$*).cnf \
+		-key dist/$*/private.key \
+		-out $@ \
+		-outform PEM
+
+# Issue an end-entity certificate from the certificate signing request.
+dist/%/certificate.pem: \
+	dist/%/request.csr \
+	etc/$$(call sca,$$*).cnf \
+	ca/certs/$$(call sca,$$*).pem \
+	ca/private/$$(call sca,$$*).key \
+	ca/private/$$(call sca,$$*).pwd \
+	| dist/%/
+	@$(OPENSSL) ca -batch -notext -create_serial \
+		-config etc/$(call sca,$*).cnf \
+		-in $< \
+		-out $@ \
+		-extensions $(call sct,$*)_ext \
+		-passin file:ca/private/$(call sca,$*).pwd
+
+# Create a PKCS#12 bundle with key, certificate, and CA chain.
+dist/%/bundle.p12: \
+	dist/%/private.key \
+	dist/%/certificate.pem \
+	pub/$$(call sca,$$*)-chain.pem \
+	| dist/%/
+	@umask 077; $(OPENSSL) pkcs12 -export \
+		-name "$(call sid,$*)" \
+		-inkey $< \
+		-in dist/$*/certificate.pem \
+		-certfile pub/$(call sca,$*)-chain.pem \
+		-out $@
+	@chmod 600 $@
+
+# Create a PEM fullchain with certificate and CA chain.
+dist/%/fullchain.pem: \
+	dist/%/certificate.pem \
+	pub/$$(call sca,$$*)-chain.pem
+	@cat $< pub/$(call sca,$*)-chain.pem > $@
+
+# Export the end-entity certificate in DER format.
+dist/%/certificate.der: dist/%/certificate.pem
+	@$(OPENSSL) x509 -in $< -out $@ -outform DER
+
+# Export the end-entity certificate in text format.
+dist/%/certificate.txt: dist/%/certificate.pem
+	@$(OPENSSL) x509 -in $< -text -noout > $@
+
+# Build all standard certificate artifacts for a certificate spec.
+.PHONY: $(CERTS)
+$(CERTS): certs/%: \
+	dist/%/request.csr \
+	dist/%/certificate.pem \
+	dist/%/fullchain.pem \
+	dist/%/certificate.der \
+	dist/%/certificate.txt
+	@echo "CERT: $@"
+	@ls -la dist/$*/
+
+# Build the PKCS#12 bundle for a certificate spec.
+.PHONY: $(P12S)
+$(P12S): p12/%: dist/%/bundle.p12
+	@echo "P12: $@"
+	@ls -la dist/$*/bundle.p12
+
+# Renew a certificate while keeping the existing private key.
+.PHONY: $(RENEWS)
+$(RENEWS): renew/%: \
+	renew-action/% \
+	dist/%/certificate.txt \
+	pub/$$(call sca,$$*).crl
+	@echo "RENEW: $@"
+	@ls -la dist/$*/
+
+# Revoke a certificate and remove its distribution artifact directory.
+.PHONY: $(REVOKES)
+$(REVOKES): revoke/%: revoke-action/% pub/$$(call sca,$$*).crl
+	@echo "REVOKE: $@"
+	@ls -la archive/$(call arc,$*).* 2>/dev/null
+
+# Revoke the old certificate and remove generated artifacts before renewal.
+renew-action/%: archive/%
+	@$(OPENSSL) ca -batch \
+		-config etc/$(call sca,$*).cnf \
+		-revoke dist/$*/certificate.pem \
+		-passin file:ca/private/$(call sca,$*).pwd \
+		-crl_reason superseded
+	@rm -f dist/$*/*.{csr,der,pem,p12,txt}
+
+# Revoke the current certificate and remove generated artifacts.
+revoke-action/%: archive/%
+	@$(OPENSSL) ca -batch \
+		-config etc/$(call sca,$*).cnf \
+		-revoke dist/$*/certificate.pem \
+		-passin file:ca/private/$(call sca,$*).pwd \
+		-crl_reason $(REASON)
+	@rm -rf dist/$*/
+
+# Archive distribution artifacts if they are available.
+archive/%: | archive/
+	@test ! -d dist/$*/ || \
+	tar -czvf "archive/$(call arc,$*).$(DATETIME).tar.gz" dist/$*/
