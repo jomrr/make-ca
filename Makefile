@@ -226,7 +226,7 @@ pub/%.crl: pub/%.crl.pem
 	@$(OPENSSL) crl -in $< -out $@ -outform DER
 
 # Generate the public trust manifest consumed by companion automation.
-pub/manifest.yml: bin/manifest $(TRUST_ARTIFACTS) | pub/
+pub/manifest.yml: bin/manifest $(TRUST_ARTIFACTS) settings.mk | pub/
 	@bin/manifest \
 		--base-url "$(BASE_URL)" \
 		--trust-anchors "$(TRUST_ANCHORS)" \
@@ -237,41 +237,40 @@ pub/manifest.yml: bin/manifest $(TRUST_ARTIFACTS) | pub/
 # =============================================================================
 
 # Generate the self-signed root CA certificate.
-ca/certs/root-ca.pem: ca/certs/%.pem: ca/reqs/%.csr \
-	| ca/db/%.txt ca/certs/ ca/new/
+ca/certs/root-ca.pem: ca/certs/%.pem: \
+	| ca/reqs/%.csr ca/db/%.txt ca/certs/ ca/new/
 	@$(OPENSSL) ca -batch -notext -create_serial \
 		-config etc/$*.cnf \
 		-passin file:ca/private/$*.pwd \
 		-selfsign \
-		-in $< \
+		-in ca/reqs/$*.csr \
 		-out $@
 
 # Generate the intermediate CA certificate signed by the root CA.
-ca/certs/intermediate-ca.pem: ca/certs/%.pem: ca/reqs/%.csr \
-	ca/certs/root-ca.pem \
-	| ca/db/%.txt ca/certs/ ca/new/
+ca/certs/intermediate-ca.pem: ca/certs/%.pem: \
+	| ca/reqs/%.csr ca/certs/root-ca.pem ca/db/%.txt ca/certs/ ca/new/
 	@$(OPENSSL) ca -batch -notext -create_serial \
 		-config etc/root-ca.cnf \
 		-keyfile ca/private/root-ca.key \
 		-passin file:ca/private/root-ca.pwd \
-		-in $< \
+		-in ca/reqs/$*.csr \
 		-out $@
 
 # Generate issuing CA certificates signed by the intermediate CA.
-ca/certs/%.pem: ca/reqs/%.csr ca/certs/intermediate-ca.pem \
-	| ca/db/%.txt ca/certs/ ca/new/
+ca/certs/%.pem: \
+	| ca/reqs/%.csr ca/certs/intermediate-ca.pem ca/db/%.txt ca/certs/ ca/new/
 	@$(OPENSSL) ca -batch -notext -create_serial \
 		-config etc/intermediate-ca.cnf \
 		-keyfile ca/private/intermediate-ca.key \
 		-passin file:ca/private/intermediate-ca.pwd \
-		-in $< \
+		-in ca/reqs/$*.csr \
 		-out $@
 
 # Create a CA certificate signing request.
-ca/reqs/%.csr: ca/private/%.key ca/private/%.pwd etc/%.cnf | ca/reqs/
+ca/reqs/%.csr: | ca/private/%.key ca/private/%.pwd etc/%.cnf ca/reqs/
 	@$(OPENSSL) req -batch -new \
 		-config etc/$*.cnf \
-		-key $< \
+		-key ca/private/$*.key \
 		-passin file:ca/private/$*.pwd \
 		-out $@ \
 		-outform PEM
@@ -302,6 +301,12 @@ ca/db/%.txt.attr: | ca/db/
 # Create a password file for encrypted CA private keys.
 ca/private/%.pwd: | ca/private/
 	@umask 077; $(OPENSSL) rand -hex 64 > $@
+	@chmod 600 $@
+
+# Recreate the current certificate serial reference from exported certificate.
+ca/refs/%/serial: dist/%/certificate.pem | ca/refs/%/
+	@$(OPENSSL) x509 -in dist/$*/certificate.pem -noout -serial | \
+		sed 's/^serial=//' > $@
 	@chmod 600 $@
 
 # =============================================================================
@@ -358,9 +363,7 @@ dist/%/key.pem: | dist/%/
 
 # Create a certificate signing request from key and request config.
 dist/%/request.csr: \
-	dist/%/key.pem \
-	etc/$$(sca)/$$(sct)/$$(sid).cnf \
-	| dist/%/
+	| dist/%/key.pem etc/$$(sca)/$$(sct)/$$(sid).cnf dist/%/
 	@$(OPENSSL) req -batch -new \
 		-config etc/$(sca)/$(sct)/$(sid).cnf \
 		-key dist/$*/key.pem \
@@ -369,15 +372,16 @@ dist/%/request.csr: \
 
 # Issue an end-entity certificate from the certificate signing request.
 dist/%/certificate.pem: \
-	dist/%/request.csr \
+	| dist/%/request.csr \
 	etc/$$(sca).cnf \
 	ca/certs/$$(sca).pem \
 	ca/private/$$(sca).key \
 	ca/private/$$(sca).pwd \
-	| dist/%/ ca/refs/%/
+	ca/refs/%/ \
+	dist/%/
 	@$(OPENSSL) ca -batch -notext -create_serial \
 		-config etc/$(sca).cnf \
-		-in $< \
+		-in dist/$*/request.csr \
 		-out $@ \
 		-extensions $(sct)_ext \
 		-passin file:ca/private/$(sca).pwd
@@ -387,37 +391,33 @@ dist/%/certificate.pem: \
 
 # Create a PKCS#12 bundle with key, certificate, and CA chain.
 dist/%/bundle.p12: \
-	dist/%/key.pem \
-	dist/%/certificate.pem \
-	pub/$$(sca)-chain.pem \
-	| dist/%/
+	dist/%/key.pem dist/%/certificate.pem pub/$$(sca)-chain.pem | dist/%/
 	@umask 077; $(OPENSSL) pkcs12 -export \
 		-name "$(sid)" \
-		-inkey $< \
+		-inkey dist/$*/key.pem \
 		-in dist/$*/certificate.pem \
 		-certfile pub/$(sca)-chain.pem \
 		-out $@
 	@chmod 600 $@
 
 # Create a PEM fullchain with certificate and CA chain.
-dist/%/fullchain.pem: \
-	dist/%/certificate.pem \
-	pub/$$(sca)-chain.pem
-	@cat $< pub/$(sca)-chain.pem > $@
+dist/%/fullchain.pem: dist/%/certificate.pem pub/$$(sca)-chain.pem
+	@cat dist/$*/certificate.pem pub/$(sca)-chain.pem > $@
 
 # Export the end-entity certificate in DER format.
 dist/%/certificate.der: dist/%/certificate.pem
-	@$(OPENSSL) x509 -in $< -out $@ -outform DER
+	@$(OPENSSL) x509 -in dist/$*/certificate.pem -out $@ -outform DER
 
 # Export the end-entity certificate in text format.
 dist/%/certificate.txt: dist/%/certificate.pem
-	@$(OPENSSL) x509 -in $< -text -noout > $@
+	@$(OPENSSL) x509 -in dist/$*/certificate.pem -text -noout > $@
 
 # Build all standard certificate artifacts for a certificate spec.
 .PHONY: $(CERTS)
 $(CERTS): certs/%: \
 	dist/%/request.csr \
 	dist/%/certificate.pem \
+	ca/refs/%/serial \
 	dist/%/fullchain.pem \
 	dist/%/certificate.der \
 	dist/%/certificate.txt
@@ -446,12 +446,13 @@ $(REVOKES): revoke/%: revoke-action/% pub/$$(sca).crl
 	@ls -la archive/$(arc).* 2>/dev/null
 
 # Revoke the old certificate and remove generated artifacts before renewal.
-renew-action/%: archive/%
+renew-action/%: archive/% ca/refs/%/serial
 	@$(OPENSSL) ca -batch \
 		-config etc/$(sca).cnf \
 		-revoke ca/new/$$(cat ca/refs/$*/serial).pem \
 		-passin file:ca/private/$(sca).pwd \
 		-crl_reason superseded
+	@rm -f pub/$(sca).crl pub/$(sca).crl.pem
 	@rm -f \
 		dist/$*/bundle.p12 \
 		dist/$*/certificate.der \
@@ -461,12 +462,13 @@ renew-action/%: archive/%
 		dist/$*/request.csr
 
 # Revoke the current certificate and remove generated artifacts.
-revoke-action/%: archive/%
+revoke-action/%: archive/% ca/refs/%/serial
 	@$(OPENSSL) ca -batch \
 		-config etc/$(sca).cnf \
 		-revoke ca/new/$$(cat ca/refs/$*/serial).pem \
 		-passin file:ca/private/$(sca).pwd \
 		-crl_reason $(REASON)
+	@rm -f pub/$(sca).crl pub/$(sca).crl.pem
 	@rm -rf dist/$*/ ca/refs/$*/serial
 
 # Archive distribution artifacts if they are available.
