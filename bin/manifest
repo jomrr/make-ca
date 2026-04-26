@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Generate a public trust manifest for make-ca.
+
+The manifest is intentionally limited to public trust-anchor data. It does not
+describe private CA state, distribution artifacts, archive data, or the complete
+CA hierarchy. The output is YAML-compatible and uses only the Python standard
+library.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import pathlib
+import sys
+from dataclasses import dataclass
+from datetime import datetime
+
+
+@dataclass(frozen=True)
+class TrustAnchorArtifact:
+    """Public artifact metadata for one trust-anchor file."""
+
+    path: pathlib.Path
+    url: str
+    sha256: str
+
+
+@dataclass(frozen=True)
+class TrustAnchor:
+    """Manifest entry for one trust anchor."""
+
+    name: str
+    pem: TrustAnchorArtifact
+    der: TrustAnchorArtifact
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Generate a make-ca public trust manifest.",
+    )
+    parser.add_argument(
+        "--base-url",
+        required=True,
+        help="Public PKI base URL, for example https://pki.example.com.",
+    )
+    parser.add_argument(
+        "--trust-anchors",
+        required=True,
+        help="Space-separated list of CA slugs used as trust anchors.",
+    )
+    return parser.parse_args()
+
+
+def quote_yaml(value: str) -> str:
+    """Return a YAML-safe double-quoted scalar."""
+    return json.dumps(value)
+
+
+def hash_file(path: pathlib.Path) -> str:
+    """Return the SHA-256 digest for a file."""
+    digest = hashlib.sha256()
+
+    with path.open("rb") as file_handle:
+        for chunk in iter(lambda: file_handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+
+    return digest.hexdigest()
+
+
+def build_artifact(base_url: str, path: pathlib.Path) -> TrustAnchorArtifact:
+    """Build manifest metadata for one public artifact."""
+    if not path.is_file():
+        raise FileNotFoundError(f"missing public artifact: {path}")
+
+    return TrustAnchorArtifact(
+        path=path,
+        url=f"{base_url}/{path.name}",
+        sha256=hash_file(path),
+    )
+
+
+def build_trust_anchor(base_url: str, name: str) -> TrustAnchor:
+    """Build a trust-anchor manifest entry."""
+    return TrustAnchor(
+        name=name,
+        pem=build_artifact(base_url, pathlib.Path("pub") / f"{name}.pem"),
+        der=build_artifact(base_url, pathlib.Path("pub") / f"{name}.der"),
+    )
+
+
+def emit_manifest(base_url: str, trust_anchors: list[TrustAnchor]) -> None:
+    """Write the trust manifest to stdout."""
+    generated_at = datetime.now().astimezone().replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    print("# file: pub/manifest.yml")
+    print(f"# date: {generated_at}")
+    print("\n---")
+    print("manifest_version: 1")
+    print(f"generated_by: {quote_yaml('make-ca')}")
+    print(f"base_url: {quote_yaml(base_url)}")
+    print("trust_anchors:")
+
+    for anchor in trust_anchors:
+        print(f"  - name: {quote_yaml(anchor.name)}")
+        print("    certificate:")
+        print("      pem:")
+        print(f"        path: {quote_yaml(str(anchor.pem.path))}")
+        print(f"        url: {quote_yaml(anchor.pem.url)}")
+        print(f"        sha256: {quote_yaml(anchor.pem.sha256)}")
+        print("      der:")
+        print(f"        path: {quote_yaml(str(anchor.der.path))}")
+        print(f"        url: {quote_yaml(anchor.der.url)}")
+        print(f"        sha256: {quote_yaml(anchor.der.sha256)}")
+
+
+def main() -> int:
+    """Run the manifest generator."""
+    arguments = parse_arguments()
+    base_url = arguments.base_url.rstrip("/")
+    anchor_names = arguments.trust_anchors.split()
+
+    if not anchor_names:
+        print("error: at least one trust anchor is required", file=sys.stderr)
+        return 2
+
+    try:
+        anchors = [
+            build_trust_anchor(base_url=base_url, name=name)
+            for name in anchor_names
+        ]
+    except FileNotFoundError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+
+    emit_manifest(base_url=base_url, trust_anchors=anchors)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -33,9 +33,15 @@ REASON			?= superseded
 # CA URL settings
 ################################################################################
 
+# hostname of webserver where CDP is hosted
+# >>> SSH config is done on the host and not in make-ca
+export PKI_HOST		:= pki.example.com
+# base directory of web server on PKI_HOST for CDP
+export PKI_ROOT		:= /var/www/pki
+# trust anchors for manifest generation
+export TRUST_ANCHORS	:= $(ROOT_CA)
 # base URL of pki, where WEBDIR is found, also used as AIA and CDP base
-export BASE_URL		:= http://pki.example.com
-
+export BASE_URL		:= https://$(PKI_HOST)
 ################################################################################
 # Key and hash algorithm settings
 ################################################################################
