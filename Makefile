@@ -48,15 +48,15 @@ emp :=
 spc := $(emp) $(emp)
 
 # stem part
-prt = $(word $(1),$(subst /,$(spc),$(2)))
+prt = $(word $(1),$(subst /,$(spc),$*))
 # stem ca
-sca = $(call prt,1,$(1))
+sca = $(call prt,1)
 # stem cert type
-sct = $(call prt,2,$(1))
+sct = $(call prt,2)
 # stem id
-sid = $(call prt,3,$(1))
+sid = $(call prt,3)
 # stem archive
-arc = $(subst /,-,$(1))
+arc = $(subst /,-,$*)
 
 # -----------------------------------------------------------------------------
 # Special make behavior
@@ -309,10 +309,10 @@ dist/%/private.key: | dist/%/
 # Create a certificate signing request from key and request config.
 dist/%/request.csr: \
 	dist/%/private.key \
-	etc/$$(call sca,$$*)/$$(call sct,$$*)/$$(call sid,$$*).cnf \
+	etc/$$(sca)/$$(sct)/$$(sid).cnf \
 	| dist/%/
 	@$(OPENSSL) req -batch -new \
-		-config etc/$(call sca,$*)/$(call sct,$*)/$(call sid,$*).cnf \
+		-config etc/$(sca)/$(sct)/$(sid).cnf \
 		-key dist/$*/private.key \
 		-out $@ \
 		-outform PEM
@@ -320,37 +320,37 @@ dist/%/request.csr: \
 # Issue an end-entity certificate from the certificate signing request.
 dist/%/certificate.pem: \
 	dist/%/request.csr \
-	etc/$$(call sca,$$*).cnf \
-	ca/certs/$$(call sca,$$*).pem \
-	ca/private/$$(call sca,$$*).key \
-	ca/private/$$(call sca,$$*).pwd \
+	etc/$$(sca).cnf \
+	ca/certs/$$(sca).pem \
+	ca/private/$$(sca).key \
+	ca/private/$$(sca).pwd \
 	| dist/%/
 	@$(OPENSSL) ca -batch -notext -create_serial \
-		-config etc/$(call sca,$*).cnf \
+		-config etc/$(sca).cnf \
 		-in $< \
 		-out $@ \
-		-extensions $(call sct,$*)_ext \
-		-passin file:ca/private/$(call sca,$*).pwd
+		-extensions $(sct)_ext \
+		-passin file:ca/private/$(sca).pwd
 
 # Create a PKCS#12 bundle with key, certificate, and CA chain.
 dist/%/bundle.p12: \
 	dist/%/private.key \
 	dist/%/certificate.pem \
-	pub/$$(call sca,$$*)-chain.pem \
+	pub/$$(sca)-chain.pem \
 	| dist/%/
 	@umask 077; $(OPENSSL) pkcs12 -export \
-		-name "$(call sid,$*)" \
+		-name "$(sid)" \
 		-inkey $< \
 		-in dist/$*/certificate.pem \
-		-certfile pub/$(call sca,$*)-chain.pem \
+		-certfile pub/$(sca)-chain.pem \
 		-out $@
 	@chmod 600 $@
 
 # Create a PEM fullchain with certificate and CA chain.
 dist/%/fullchain.pem: \
 	dist/%/certificate.pem \
-	pub/$$(call sca,$$*)-chain.pem
-	@cat $< pub/$(call sca,$*)-chain.pem > $@
+	pub/$$(sca)-chain.pem
+	@cat $< pub/$(sca)-chain.pem > $@
 
 # Export the end-entity certificate in DER format.
 dist/%/certificate.der: dist/%/certificate.pem
@@ -382,35 +382,35 @@ $(P12S): p12/%: dist/%/bundle.p12
 $(RENEWS): renew/%: \
 	renew-action/% \
 	dist/%/certificate.txt \
-	pub/$$(call sca,$$*).crl
+	pub/$$(sca).crl
 	@echo "RENEW: $@"
 	@ls -la dist/$*/
 
 # Revoke a certificate and remove its distribution artifact directory.
 .PHONY: $(REVOKES)
-$(REVOKES): revoke/%: revoke-action/% pub/$$(call sca,$$*).crl
+$(REVOKES): revoke/%: revoke-action/% pub/$$(sca).crl
 	@echo "REVOKE: $@"
-	@ls -la archive/$(call arc,$*).* 2>/dev/null
+	@ls -la archive/$(arc).* 2>/dev/null
 
 # Revoke the old certificate and remove generated artifacts before renewal.
 renew-action/%: archive/%
 	@$(OPENSSL) ca -batch \
-		-config etc/$(call sca,$*).cnf \
+		-config etc/$(sca).cnf \
 		-revoke dist/$*/certificate.pem \
-		-passin file:ca/private/$(call sca,$*).pwd \
+		-passin file:ca/private/$(sca).pwd \
 		-crl_reason superseded
 	@rm -f dist/$*/*.{csr,der,pem,p12,txt}
 
 # Revoke the current certificate and remove generated artifacts.
 revoke-action/%: archive/%
 	@$(OPENSSL) ca -batch \
-		-config etc/$(call sca,$*).cnf \
+		-config etc/$(sca).cnf \
 		-revoke dist/$*/certificate.pem \
-		-passin file:ca/private/$(call sca,$*).pwd \
+		-passin file:ca/private/$(sca).pwd \
 		-crl_reason $(REASON)
 	@rm -rf dist/$*/
 
 # Archive distribution artifacts if they are available.
 archive/%: | archive/
 	@test ! -d dist/$*/ || \
-	tar -czvf "archive/$(call arc,$*).$(DATETIME).tar.gz" dist/$*/
+	tar -czvf "archive/$(arc).$(DATETIME).tar.gz" dist/$*/
