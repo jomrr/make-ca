@@ -44,7 +44,7 @@ export PKI_TARGETS	:= $(PKI_HOST):/var/www/pki
 # trust anchors for manifest generation
 export TRUST_ANCHORS	:= $(ROOT_CA)
 # base URL of pki, where WEBDIR is found, also used as AIA and CDP base
-export BASE_URL		:= https://$(PKI_HOST)
+export BASE_URL		:= http://$(PKI_HOST)
 ################################################################################
 # Key and hash algorithm settings
 ################################################################################
