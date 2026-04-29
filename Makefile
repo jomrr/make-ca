@@ -119,10 +119,31 @@ publish_check	= $(foreach tgt,$(PKI_TARGETS),$(RSYNC) --dry-run pub/ $(tgt);)
 .PHONY: help
 help:
 	@printf '%s\n' "Usage: make [target] [CPK_ALG=algorithm]"
-	@printf '%s\n' "       make certs/*   Create certs from static config"
-	@printf '%s\n' "       make p12/*     Create PKCS#12 bundles"
-	@printf '%s\n' "       make renew/*   Renew certs from static config"
-	@printf '%s\n\n' "       make revoke/*  Revoke certs"
+	@printf '%s\n'
+	@printf '%s\n' "CA targets:"
+	@printf '%s\n' "       make init        Initialize CAs and public artifacts"
+	@printf '%s\n' "       make crls        Generate or renew CRLs when required"
+	@printf '%s\n' "       make manifest    Generate public trust manifest"
+	@printf '%s\n'
+	@printf '%s\n' "Certificate targets:"
+	@printf '%s\n' "       make certs/*     Create certs from static config"
+	@printf '%s\n' "       make p12/*       Create PKCS#12 bundles"
+	@printf '%s\n' "       make renew/*     Renew certs from static config"
+	@printf '%s\n' "       make revoke/*    Revoke certs"
+	@printf '%s\n'
+	@printf '%s\n' "Publishing targets:"
+	@printf '%s\n' "       make publish-check  Dry-run publishing artifacts"
+	@printf '%s\n' "       make publish        Publish artifacts"
+	@printf '%s\n'
+	@printf '%s\n' "Inspection targets:"
+	@printf '%s\n' "       make print       Print compact CA database records"
+	@printf '%s\n' "       make print-full  Print CA database records with full serials"
+	@printf '%s\n'
+	@printf '%s\n' "Cleanup targets:"
+	@printf '%s\n' "       make clean       Delete derived certificate export artifacts"
+	@printf '%s\n' "       make destroy     Delete runtime state with confirmation"
+	@printf '%s\n' "       make mrproper    Delete runtime state without confirmation"
+	@printf '%s\n'
 	@printf '%s\n' "Static config path: etc/<CA>/<CERT_TYPE>/<ID>.cnf"
 	@printf '%s\n' "Default values are defined in settings.mk"
 
