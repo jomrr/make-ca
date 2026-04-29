@@ -72,6 +72,10 @@ sid		= $(call prt,3)
 # stem archive
 arc		= $(subst /,-,$*)
 
+# publish helper functions for multiple targets in PKI_TARGETS
+publish_pub	= $(foreach tgt,$(PKI_TARGETS),$(RSYNC) pub/ $(tgt);)
+publish_check	= $(foreach tgt,$(PKI_TARGETS),$(RSYNC) --dry-run pub/ $(tgt);)
+
 # -----------------------------------------------------------------------------
 # Special make behavior
 # -----------------------------------------------------------------------------
@@ -134,11 +138,6 @@ clean:
 		-o -name certificate.txt \
 		-o -name fullchain.pem \) -delete
 
-# Delete generated end-entity certificate artifacts.
-.PHONY: distclean
-distclean:
-	@rm -rf dist/
-
 # Delete runtime state directories with interactive confirmation.
 .PHONY: destroy
 destroy:
@@ -161,14 +160,14 @@ crls: $(foreach ca,$(ALL_CA),pub/$(ca).crl)
 manifest: pub/manifest.yml
 
 # Dry-run for deploying public CA artifacts and revocation lists to the CDP.
-.PHONY: deploy-check
-deploy-check: init
-	@$(RSYNC) --dry-run pub/ $(PKI_HOST):$(PKI_ROOT)/
+.PHONY: publish-check
+publish-check: init
+	@$(publish_check)
 
 # Deploy public CA artifacts and revocation lists to the CDP.
-.PHONY: deploy
-deploy: init
-	@$(RSYNC) pub/ $(PKI_HOST):$(PKI_ROOT)/
+.PHONY: publish
+publish: init
+	@$(publish_pub)
 
 # Print CA database records in compact format.
 .PHONY: print
@@ -215,11 +214,8 @@ pub/%-chain.p7b: pub/%-chain.pem | pub/
 	@$(OPENSSL) crl2pkcs7 -nocrl -certfile $< -out $@ -outform DER
 
 # Generate a PEM encoded CRL for a CA.
-pub/%.crl.pem: pub/%.pem ca/db/%.txt | ca/db/%.crlnumber pub/
-	@$(OPENSSL) ca -gencrl \
-		-config etc/$*.cnf \
-		-passin file:ca/private/$*.pwd \
-		-out $@
+pub/%.crl.pem: | ca/db/%.crlnumber ca/db/%.txt pub/%.pem pub/
+	@bin/crl "$*" "$(CRL_RENEW_THRESHOLD)" "$@"
 
 # Convert a PEM encoded CRL to DER format.
 pub/%.crl: pub/%.crl.pem
@@ -340,6 +336,7 @@ test-vars:
 .PHONY: test
 test:
 	@bin/test
+
 # =============================================================================
 # Dynamic end-entity certificate targets
 # =============================================================================
@@ -356,7 +353,7 @@ dist/%/key.pem: | dist/%/
 
 # Create a certificate signing request from key and request config.
 dist/%/request.csr: \
-	$$(if $$(filter renew/%,$$(MAKECMDGOALS)),renew-action/$$*) \
+	$$(if $$(filter renew/$$*,$$(MAKECMDGOALS)),renew-action/$$*) \
 	dist/%/key.pem \
 	| etc/$$(sca)/$$(sct)/$$(sid).cnf dist/%/
 	@$(OPENSSL) req -batch -new \

@@ -29,15 +29,18 @@ export DN_OU		?= $(DN_O) PKI
 # aACompromise:		attribute authority has been compromised
 REASON			?= superseded
 
+# Renew CRLs when they expire within this many seconds.
+CRL_RENEW_THRESHOLD	:= 86400
+
 ################################################################################
 # CA URL settings
 ################################################################################
 
-# hostname of webserver where CDP is hosted
+# hostname of webserver where CDP is hosted)
 # >>> SSH config is done on the host and not in make-ca
 export PKI_HOST		:= pki.example.com
-# base directory of web server on PKI_HOST for CDP
-export PKI_ROOT		:= /var/www/pki
+# One or multiple targets for publishing CA artifacts and CRLs.
+export PKI_TARGETS	:= $(PKI_HOST):/var/www/pki
 # trust anchors for manifest generation
 export TRUST_ANCHORS	:= $(ROOT_CA)
 # base URL of pki, where WEBDIR is found, also used as AIA and CDP base

@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+# Generate a PEM encoded CRL for one configured OpenSSL CA.
+#
+# Make provides the required target path and input file ordering. The script
+# renews the CRL when the PEM file is missing, when the OpenSSL CA index is
+# newer than the PEM CRL, or when nextUpdate enters the configured renewal
+# threshold window.
+
+set -Eeuo pipefail
+
+# Use absolute tool paths to avoid PATH-dependent behavior in privileged runs.
+declare -r OPENSSL="/usr/bin/openssl"
+declare -r DATE="/usr/bin/date"
+
+usage() {
+    # Print the expected command line interface for invalid invocations.
+    printf 'Usage: %s <ca-name> <renew-threshold-seconds> <output-pem>\n' "$0" >&2
+}
+
+fail() {
+    local message=""
+
+    message="$1"
+
+    # Emit a deterministic error message and use exit code 2 for input errors.
+    printf 'ERROR: %s\n' "${message}" >&2
+    exit 2
+}
+
+require_file() {
+    local path=""
+
+    path="$1"
+
+    # Required files must exist before their dependent operation runs.
+    [[ -f "${path}" ]] || fail "missing file: ${path}"
+}
+
+is_valid_ca_name() {
+    local ca_name=""
+
+    ca_name="$1"
+
+    # CA names are restricted to safe repository path components.
+    [[ "${ca_name}" =~ ^[A-Za-z0-9_.-]+$ ]]
+}
+
+is_valid_seconds() {
+    local seconds=""
+
+    seconds="$1"
+
+    # The renewal threshold is passed as seconds and must be numeric.
+    [[ "${seconds}" =~ ^[0-9]+$ ]]
+}
+
+next_update_epoch() {
+    local crl_pem=""
+    local next_update_line=""
+    local next_update_raw=""
+
+    crl_pem="$1"
+
+    # OpenSSL returns the timestamp as "nextUpdate=<date>".
+    next_update_line="$("${OPENSSL}" crl -in "${crl_pem}" -noout -nextupdate)"
+
+    # Strip the OpenSSL field prefix before parsing the timestamp.
+    next_update_raw="${next_update_line#nextUpdate=}"
+
+    # GNU date can parse the OpenSSL timestamp format on Fedora.
+    "${DATE}" -u -d "${next_update_raw}" '+%s'
+}
+
+renewal_required() {
+    local ca_db=""
+    local crl_pem=""
+    local renew_threshold=""
+    local current_epoch=""
+    local threshold_epoch=""
+    local crl_next_update_epoch=""
+
+    ca_db="$1"
+    crl_pem="$2"
+    renew_threshold="$3"
+
+    # Missing CRLs must be generated.
+    if [[ ! -f "${crl_pem}" ]]; then
+        return 0
+    fi
+
+    # A newer CA index can contain changed certificate status information.
+    if [[ "${ca_db}" -nt "${crl_pem}" ]]; then
+        return 0
+    fi
+
+    # Calculate the threshold timestamp for proactive CRL renewal.
+    current_epoch="$("${DATE}" -u '+%s')"
+    threshold_epoch="$((current_epoch + renew_threshold))"
+
+    # Read nextUpdate from the existing CRL.
+    crl_next_update_epoch="$(next_update_epoch "${crl_pem}")"
+
+    # Renewal is required once nextUpdate enters the threshold window.
+    (( crl_next_update_epoch <= threshold_epoch ))
+}
+
+generate_crl() {
+    local ca_config=""
+    local ca_password=""
+    local ca_crl_number=""
+    local crl_pem=""
+
+    ca_config="$1"
+    ca_password="$2"
+    ca_crl_number="$3"
+    crl_pem="$4"
+
+    # OpenSSL requires the CA config, password file, and CRL number state.
+    require_file "${ca_config}"
+    require_file "${ca_password}"
+    require_file "${ca_crl_number}"
+
+    # CRL generation updates the CA CRL number in the CA database.
+    "${OPENSSL}" ca -gencrl \
+        -config "${ca_config}" \
+        -passin "file:${ca_password}" \
+        -out "${crl_pem}"
+}
+
+main() {
+    local ca_name=""
+    local renew_threshold=""
+    local crl_pem=""
+    local ca_config=""
+    local ca_password=""
+    local ca_db=""
+    local ca_crl_number=""
+
+    # The script has a fixed interface to keep Makefile calls explicit.
+    if [[ "$#" -ne 3 ]]; then
+        usage
+        exit 2
+    fi
+
+    ca_name="$1"
+    renew_threshold="$2"
+    crl_pem="$3"
+
+    # Validate external input before deriving repository paths.
+    is_valid_ca_name "${ca_name}" || fail "invalid CA name: ${ca_name}"
+    is_valid_seconds "${renew_threshold}" || fail "renew threshold must be numeric"
+
+    # Derive CA paths from the validated CA name.
+    ca_config="etc/${ca_name}.cnf"
+    ca_password="ca/private/${ca_name}.pwd"
+    ca_db="ca/db/${ca_name}.txt"
+    ca_crl_number="ca/db/${ca_name}.crlnumber"
+
+    # The CA index is required for index freshness checks.
+    require_file "${ca_db}"
+
+    # Generate a new CRL only when state or threshold checks require renewal.
+    if renewal_required "${ca_db}" "${crl_pem}" "${renew_threshold}"; then
+        generate_crl "${ca_config}" "${ca_password}" "${ca_crl_number}" "${crl_pem}"
+    fi
+}
+
+main "$@"
