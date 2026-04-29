@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Run all make-ca test scripts in lexical order.
+#
+# Each test script is responsible for creating its own isolated workspace. The
+# orchestrator only discovers and executes test files.
+
+set -Eeuo pipefail
+
+declare -r REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+declare -a TEST_FILES=()
+declare TEST_FILE=""
+
+mapfile -t TEST_FILES < <(
+    find "${REPO_ROOT}/tests" -maxdepth 1 -type f -name 'test-*.sh' -print | sort
+)
+
+if (( ${#TEST_FILES[@]} == 0 )); then
+    printf 'ERROR: no test scripts found\n' >&2
+    exit 1
+fi
+
+for TEST_FILE in "${TEST_FILES[@]}"; do
+    printf '==> %s\n' "${TEST_FILE#${REPO_ROOT}/}"
+    TEST_REPO_ROOT="${REPO_ROOT}" bash "${TEST_FILE}"
+done
+
+printf '==> all tests passed\n'

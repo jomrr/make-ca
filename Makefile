@@ -339,14 +339,7 @@ test-vars:
 
 .PHONY: test
 test:
-	$(MAKE) mrproper 1>/dev/null
-	$(MAKE) init 1>/dev/null
-	$(MAKE) crls 1>/dev/null
-	$(MAKE) certs/component-ca/server/fritzbox 1>/dev/null
-	$(MAKE) revoke/component-ca/server/fritzbox 1>/dev/null
-	$(MAKE) crls 1>/dev/null
-	$(MAKE) mrproper 1>/dev/null
-
+	@bin/test
 # =============================================================================
 # Dynamic end-entity certificate targets
 # =============================================================================
@@ -363,7 +356,9 @@ dist/%/key.pem: | dist/%/
 
 # Create a certificate signing request from key and request config.
 dist/%/request.csr: \
-	| dist/%/key.pem etc/$$(sca)/$$(sct)/$$(sid).cnf dist/%/
+	$$(if $$(filter renew/%,$$(MAKECMDGOALS)),renew-action/$$*) \
+	dist/%/key.pem \
+	| etc/$$(sca)/$$(sct)/$$(sid).cnf dist/%/
 	@$(OPENSSL) req -batch -new \
 		-config etc/$(sca)/$(sct)/$(sid).cnf \
 		-key dist/$*/key.pem \
@@ -371,9 +366,8 @@ dist/%/request.csr: \
 		-outform PEM
 
 # Issue an end-entity certificate from the certificate signing request.
-dist/%/certificate.pem: \
-	| dist/%/request.csr \
-	etc/$$(sca).cnf \
+dist/%/certificate.pem: dist/%/request.csr \
+	| etc/$$(sca).cnf \
 	ca/certs/$$(sca).pem \
 	ca/private/$$(sca).key \
 	ca/private/$$(sca).pwd \
@@ -433,7 +427,6 @@ $(P12S): p12/%: dist/%/bundle.p12
 # Renew a certificate while keeping the existing private key.
 .PHONY: $(RENEWS)
 $(RENEWS): renew/%: \
-	renew-action/% \
 	dist/%/certificate.txt \
 	pub/$$(sca).crl
 	@echo "RENEW: $@"
@@ -456,10 +449,8 @@ renew-action/%: archive/% ca/refs/%/serial
 	@rm -f \
 		dist/$*/bundle.p12 \
 		dist/$*/certificate.der \
-		dist/$*/certificate.pem \
 		dist/$*/certificate.txt \
-		dist/$*/fullchain.pem \
-		dist/$*/request.csr
+		dist/$*/fullchain.pem
 
 # Revoke the current certificate and remove generated artifacts.
 revoke-action/%: archive/% ca/refs/%/serial
