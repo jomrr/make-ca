@@ -256,7 +256,7 @@ pub/manifest.yml: bin/manifest $(TRUST_ARTIFACTS) settings.mk | pub/
 # Generate the self-signed root CA certificate.
 ca/certs/root-ca.pem: ca/certs/%.pem: \
 	| ca/reqs/%.csr ca/db/%.txt ca/certs/ ca/new/
-	@$(OPENSSL) ca -batch -notext -create_serial \
+	@$(OPENSSL) ca -batch -notext -rand_serial \
 		-config etc/$*.cnf \
 		-passin file:ca/private/$*.pwd \
 		-selfsign \
@@ -266,7 +266,7 @@ ca/certs/root-ca.pem: ca/certs/%.pem: \
 # Generate the intermediate CA certificate signed by the root CA.
 ca/certs/intermediate-ca.pem: ca/certs/%.pem: \
 	| ca/reqs/%.csr ca/certs/root-ca.pem ca/db/%.txt ca/certs/ ca/new/
-	@$(OPENSSL) ca -batch -notext -create_serial \
+	@$(OPENSSL) ca -batch -notext -rand_serial \
 		-config etc/root-ca.cnf \
 		-keyfile ca/private/root-ca.key \
 		-passin file:ca/private/root-ca.pwd \
@@ -276,7 +276,7 @@ ca/certs/intermediate-ca.pem: ca/certs/%.pem: \
 # Generate issuing CA certificates signed by the intermediate CA.
 ca/certs/%.pem: \
 	| ca/reqs/%.csr ca/certs/intermediate-ca.pem ca/db/%.txt ca/certs/ ca/new/
-	@$(OPENSSL) ca -batch -notext -create_serial \
+	@$(OPENSSL) ca -batch -notext -rand_serial \
 		-config etc/intermediate-ca.cnf \
 		-keyfile ca/private/intermediate-ca.key \
 		-passin file:ca/private/intermediate-ca.pwd \
@@ -391,7 +391,7 @@ dist/%/certificate.pem: dist/%/request.csr \
 	ca/private/$$(sca).pwd \
 	ca/refs/%/ \
 	dist/%/
-	@$(OPENSSL) ca -batch -notext -create_serial \
+	@$(OPENSSL) ca -batch -notext -rand_serial \
 		-config etc/$(sca).cnf \
 		-in dist/$*/request.csr \
 		-out $@ \
