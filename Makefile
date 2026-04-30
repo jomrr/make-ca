@@ -122,7 +122,7 @@ publish_check	= $(foreach tgt,$(PKI_TARGETS),$(RSYNC) --dry-run pub/ $(tgt);)
 
 .PHONY: help
 help:
-	@printf '%s\n' "Usage: make [target] [CPK_ALG=algorithm]"
+	@printf '%s\n' "Usage: make [target] [CRT_KEY_ALGORITHM=algorithm]"
 	@printf '%s\n'
 	@printf '%s\n' "CA targets:"
 	@printf '%s\n' "       make init        Initialize CAs and public artifacts"
@@ -305,7 +305,7 @@ ca/reqs/%.csr: | ca/private/%.key ca/private/%.pwd etc/%.cnf ca/reqs/
 ca/private/%.key: | ca/private/%.pwd
 	@umask 077; $(OPENSSL) genpkey \
 		-out $@ \
-		-algorithm $(CAK_ALG) \
+		-algorithm $(CA_KEY_ALGORITHM) \
 		-aes256 \
 		-pass file:ca/private/$*.pwd
 	@chmod 600 $@
@@ -360,8 +360,8 @@ dist/%/: | dist/
 
 .PHONY: test-vars
 test-vars:
-	@echo "CAK_ALG: $(CAK_ALG)"
-	@echo "CPK_ALG: $(CPK_ALG)"
+	@echo "CA_KEY_ALGORITHM: $(CA_KEY_ALGORITHM)"
+	@echo "CRT_KEY_ALGORITHM: $(CRT_KEY_ALGORITHM)"
 
 .PHONY: test
 test:
@@ -378,7 +378,7 @@ test:
 
 # Create an end-entity private key.
 dist/%/key.pem: | dist/%/
-	@umask 077; $(OPENSSL) genpkey -out $@ -algorithm $(CPK_ALG)
+	@umask 077; $(OPENSSL) genpkey -out $@ -algorithm $(CRT_KEY_ALGORITHM)
 	@chmod 600 $@
 
 # Create a certificate signing request from key and request config.

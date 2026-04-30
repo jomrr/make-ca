@@ -67,8 +67,8 @@ export DEFAULT_BITS	?= 4096
 export DEFAULT_MD	?= sha384
 
 # Algorithms for CA private keys for easier assignment in Makefile
-# Example 1: make init CAK_ALG=ED25519
-# Example 2: make init CAK_ALG=\$\(P384\)
+# Example 1: make init CA_KEY_ALGORITHM=ED25519
+# Example 2: make init CA_KEY_ALGORITHM=\$\(P384\)
 
 export ED25519		:= ED25519
 export ED448		:= ED448
@@ -77,11 +77,11 @@ export P521		:= EC -pkeyopt ec_paramgen_curve:P-521
 export RSA		:= RSA -pkeyopt rsa_keygen_bits:$(DEFAULT_BITS)
 
 # CA private Keys:
-# param for openssl genpkey -algorithm $(CAK_ALG)
+# param for openssl genpkey -algorithm $(CA_KEY_ALGORITHM)
 
-CAK_ALG			?= $(RSA)
+CA_KEY_ALGORITHM	?= $(RSA)
 
 # Certificate Private Keys:
-# param for openssl genpkey -algorithm $(CPK_ALG)
+# param for openssl genpkey -algorithm $(CRT_KEY_ALGORITHM)
 
-CPK_ALG			?= $(RSA)
+CRT_KEY_ALGORITHM	?= $(RSA)
