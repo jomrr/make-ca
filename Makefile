@@ -447,6 +447,9 @@ $(P12S): p12/%: dist/%/bundle.p12
 	@ls -la dist/$*/bundle.p12
 
 # Renew a certificate while keeping the existing private key.
+# The CSR rule injects renew-action/% when reached through renew/%.
+# That revokes the old certificate before Make rebuilds the CSR,
+# certificate export, text export, and CRL.
 .PHONY: $(RENEWS)
 $(RENEWS): renew/%: \
 	dist/%/certificate.txt \
@@ -484,6 +487,6 @@ revoke-action/%: archive/% ca/refs/%/serial
 	@rm -f pub/$(sca).crl pub/$(sca).crl.pem
 	@rm -rf dist/$*/ ca/refs/$*/serial
 
-# Archive distribution artifacts if they are available.
-archive/%: | dist/%/certificate.pem archive/
+# Archive existing distribution artifacts before renewal or revocation.
+archive/%: | archive/
 	@tar -czvf "archive/$(arc).$(DATETIME).tar.gz" dist/$*/
