@@ -1,6 +1,6 @@
 # TLS certificate request for AVM FritzBox
 [default]
-CN                      = changeme.myfritz.net
+CN                      = fritzbox.example.com
 
 [req]
 default_bits            = ${ENV::DEFAULT_BITS}  # RSA key size
@@ -21,10 +21,6 @@ organizationalUnitName  = ${ENV::DN_OU}
 commonName              = ${CN}
 
 [fritzbox_reqext]
-basicConstraints        = critical,CA:FALSE
-keyUsage                = critical,digitalSignature,keyEncipherment
-extendedKeyUsage        = serverAuth
-subjectKeyIdentifier    = hash
 subjectAltName          = @fritzbox_san
 
 [fritzbox_san]

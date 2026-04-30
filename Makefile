@@ -31,9 +31,18 @@ include settings.mk
 # Timestamp used for archive file names.
 DATETIME	:= $(shell date +%Y-%m-%dT%H:%M:%S%z)
 
-# Static certificate request configuration files.
+# Static end-entity request configuration files.
 CONFIGS		:= $(sort $(wildcard etc/*/*/*.cnf))
-CERT_SPECS	:= $(patsubst etc/%.cnf,%,$(CONFIGS))
+
+# FRITZ!Box certificates use a dedicated target family.
+FRITZBOX_CONFIGS := $(sort $(wildcard etc/*/fritzbox/*.cnf))
+
+# Standard certificate configs exclude special-purpose target families.
+CERT_CONFIGS	:= $(filter-out $(FRITZBOX_CONFIGS),$(CONFIGS))
+
+# Static certificate specs.
+CERT_SPECS	:= $(patsubst etc/%.cnf,%,$(CERT_CONFIGS))
+FRITZBOX_SPECS	:= $(patsubst etc/%.cnf,%,$(FRITZBOX_CONFIGS))
 
 # Certificates with active make-ca state.
 ISSUED_REFS	:= $(sort $(wildcard ca/refs/*/*/*/serial))
@@ -41,6 +50,7 @@ ISSUED_SPECS	:= $(patsubst ca/refs/%/serial,%,$(ISSUED_REFS))
 
 # Explicit targets are kept for shell and make completion.
 CERTS		:= $(addprefix certs/,$(CERT_SPECS))
+FRITZBOXES	:= $(addprefix fritzbox/,$(FRITZBOX_SPECS))
 P12S		:= $(addprefix p12/,$(CERT_SPECS))
 RENEWS		:= $(addprefix renew/,$(ISSUED_SPECS))
 REVOKES		:= $(addprefix revoke/,$(ISSUED_SPECS))
@@ -91,6 +101,7 @@ publish_check	= $(foreach tgt,$(PKI_TARGETS),$(RSYNC) --dry-run pub/ $(tgt);)
 	dist/%/certificate.der \
 	dist/%/certificate.pem \
 	dist/%/certificate.txt \
+	dist/%/fritzbox.pem \
 	dist/%/fullchain.pem \
 	dist/%/key.pem \
 	dist/%/request.csr
@@ -444,6 +455,29 @@ $(CERTS): certs/%: \
 	dist/%/certificate.txt
 	@echo "CERT: $@"
 	@ls -la dist/$*/
+
+# Create a FRITZ!Box PEM import file.
+# FRITZ!Box import is picky: unencrypted RSA private key first,
+# followed by the leaf certificate and CA chain.
+dist/%/fritzbox.pem: CRT_KEY_ALGORITHM := $(RSA)
+dist/%/fritzbox.pem: \
+	dist/%/key.pem \
+	dist/%/certificate.pem \
+	pub/$$(sca)-chain.pem \
+	| dist/%/
+	@cat \
+		dist/$*/key.pem \
+		dist/$*/certificate.pem \
+		pub/$(sca)-chain.pem \
+		> $@
+	@chmod 600 $@
+
+# Build a FRITZ!Box PEM import file.
+.PHONY: $(FRITZBOXES)
+$(FRITZBOXES): CRT_KEY_ALGORITHM := $(RSA)
+$(FRITZBOXES): fritzbox/%: dist/%/fritzbox.pem dist/%/certificate.txt
+	@echo "FRITZBOX: $@"
+	@ls -la dist/$*/fritzbox.pem
 
 # Build the PKCS#12 bundle for a certificate spec.
 .PHONY: $(P12S)

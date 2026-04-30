@@ -59,7 +59,7 @@ file_sha256() {
 }
 
 snapshot_ca_identity_state() {
-    local snapshot_file=""
+    local snapshot_file
 
     snapshot_file="$1"
 
@@ -106,30 +106,58 @@ assert_same_file() {
     fi
 }
 
-choose_cert_spec() {
+choose_standard_cert_spec() {
     local spec
 
     spec="$(
         find etc -mindepth 3 -maxdepth 3 -type f -name '*.cnf' \
+            ! -path 'etc/*/fritzbox/*' \
             | sort \
             | sed 's#^etc/##; s#\.cnf$##' \
             | head -n 1
     )"
 
-    [[ -n "${spec}" ]] || test_fail "no certificate spec found below etc/<CA>/<TYPE>/<ID>.cnf"
+    [[ -n "${spec}" ]] || test_fail "no standard certificate spec found below etc/<CA>/<TYPE>/<ID>.cnf"
+
+    TEST_CERT_SPEC="${spec}"
+    TEST_CERT_CA="${TEST_CERT_SPEC%%/*}"
+}
+
+choose_fritzbox_cert_spec() {
+    local spec
+
+    spec="$(
+        find etc -mindepth 3 -maxdepth 3 -type f -path 'etc/*/fritzbox/*.cnf' \
+            | sort \
+            | sed 's#^etc/##; s#\.cnf$##' \
+            | head -n 1
+    )"
+
+    [[ -n "${spec}" ]] || test_fail "no FRITZ!Box certificate spec found below etc/<CA>/fritzbox/<ID>.cnf"
 
     TEST_CERT_SPEC="${spec}"
     TEST_CERT_CA="${TEST_CERT_SPEC%%/*}"
 }
 
 setup_workspace() {
+    local spec_type
+
+    spec_type="${1:-standard}"
     TEST_WORK_DIR="$(mktemp -d)"
 
     tar -C "${TEST_REPO_ROOT}" -cf - Makefile settings.mk bin etc \
         | tar -C "${TEST_WORK_DIR}" -xf -
 
     cd -- "${TEST_WORK_DIR}"
-    choose_cert_spec
+
+    case "${spec_type}" in
+        fritzbox)
+            choose_fritzbox_cert_spec
+            ;;
+        *)
+            choose_standard_cert_spec
+            ;;
+    esac
 
     test_log "workspace: ${TEST_WORK_DIR}"
     test_log "cert spec: ${TEST_CERT_SPEC}"

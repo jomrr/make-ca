@@ -10,7 +10,6 @@ utf8                    = yes                   # Input is UTF-8
 string_mask             = utf8only              # Emit UTF-8 strings
 prompt                  = no                    # Prompt for DN
 distinguished_name      = client_dn             # DN template
-req_extensions          = client_reqext         # Desired extensions
 
 [client_dn]
 countryName             = ${ENV::DN_C}
@@ -19,9 +18,3 @@ localityName            = ${ENV::DN_L}
 organizationName        = ${ENV::DN_O}
 organizationalUnitName  = ${ENV::DN_OU}
 commonName              = ${ENV::CN}
-
-[client_reqext]
-basicConstraints        = critical,CA:FALSE
-keyUsage                = critical,digitalSignature
-extendedKeyUsage        = clientAuth,pkInitClientAuth
-subjectKeyIdentifier    = hash

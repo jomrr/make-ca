@@ -77,6 +77,15 @@ authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
+[fritzbox_ext]
+basicConstraints        = critical,CA:FALSE
+keyUsage                = critical,digitalSignature,keyEncipherment
+extendedKeyUsage        = serverAuth
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+
 [server_ext]
 basicConstraints        = critical,CA:FALSE
 keyUsage                = critical,digitalSignature,keyEncipherment
