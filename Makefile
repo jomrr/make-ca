@@ -132,8 +132,8 @@ help:
 	@printf '%s\n' "Certificate targets:"
 	@printf '%s\n' "       make certs/*     Create certs from static config"
 	@printf '%s\n' "       make p12/*       Create PKCS#12 bundles"
-	@printf '%s\n' "       make renew/*     Renew certs from static config"
-	@printf '%s\n' "       make revoke/*    Revoke certs"
+	@printf '%s\n' "       make renew/*     Renew existing certs"
+	@printf '%s\n' "       make revoke/*    Revoke existing certs"
 	@printf '%s\n'
 	@printf '%s\n' "Publishing targets:"
 	@printf '%s\n' "       make publish-check  Dry-run publishing artifacts"
