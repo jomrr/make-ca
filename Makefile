@@ -157,7 +157,7 @@ all: init
 # Delete derived export artifacts while keeping keys, CSRs, and certificates.
 .PHONY: clean
 clean:
-	@test ! -d dist || find dist -type f \
+	@find dist -type f \
 		\( -name bundle.p12 \
 		-o -name certificate.der \
 		-o -name certificate.txt \
@@ -204,7 +204,7 @@ print:
 print-full:
 	@bin/print --full ca/db
 
-# Meta target to force rebuild.
+# Meta target to force rule evaluation.
 .PHONY: FORCE
 FORCE:
 
@@ -242,8 +242,8 @@ pub/%-chain.pem: \
 pub/%-chain.p7b: pub/%-chain.pem | pub/
 	@$(OPENSSL) crl2pkcs7 -nocrl -certfile $< -out $@ -outform DER
 
-# Generate a PEM encoded CRL for a CA.
-# FORCE is needed to regenerate expiring CRLs.
+# Generate or refresh a PEM encoded CRL for a CA.
+# CRL expiry is time-dependent, so bin/crl must always be reached.
 pub/%.crl.pem: FORCE ca/db/%.txt | ca/db/%.crlnumber pub/%.pem pub/
 	@bin/crl "$*" "$(CRL_RENEW_THRESHOLD)" "$@"
 
