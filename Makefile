@@ -204,6 +204,10 @@ print:
 print-full:
 	@bin/print --full ca/db
 
+# Meta target to force rebuild.
+.PHONY: FORCE
+FORCE:
+
 # =============================================================================
 # Public CA artifacts and revocation lists
 # =============================================================================
@@ -239,7 +243,8 @@ pub/%-chain.p7b: pub/%-chain.pem | pub/
 	@$(OPENSSL) crl2pkcs7 -nocrl -certfile $< -out $@ -outform DER
 
 # Generate a PEM encoded CRL for a CA.
-pub/%.crl.pem: | ca/db/%.crlnumber ca/db/%.txt pub/%.pem pub/
+# FORCE is needed to regenerate expiring CRLs.
+pub/%.crl.pem: FORCE ca/db/%.txt | ca/db/%.crlnumber pub/%.pem pub/
 	@bin/crl "$*" "$(CRL_RENEW_THRESHOLD)" "$@"
 
 # Convert a PEM encoded CRL to DER format.
