@@ -38,13 +38,13 @@ CRL_RENEW_THRESHOLD	:= 86400
 
 # hostname of webserver where CDP is hosted)
 # >>> SSH config is done on the host and not in make-ca
-export PKI_HOST		:= pki.example.com
+export CDP_HOST		:= pki.example.com
 # One or multiple targets for publishing CA artifacts and CRLs.
-export PKI_TARGETS	:= $(PKI_HOST):/var/www/pki
+export PUB_TARGETS	:= $(CDP_HOST):/var/www/pki
 # trust anchors for manifest generation
 export TRUST_ANCHORS	:= $(ROOT_CA)
 # base URL of pki, where WEBDIR is found, also used as AIA and CDP base
-export BASE_URL		:= http://$(PKI_HOST)
+export BASE_URL		:= http://$(CDP_HOST)
 ################################################################################
 # Key and hash algorithm settings
 ################################################################################
