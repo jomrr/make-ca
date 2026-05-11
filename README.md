@@ -216,8 +216,8 @@ Important settings include:
 | `DN_OU` | Default subject organizational unit |
 | `REASON` | Default revocation reason |
 | `CRL_RENEW_THRESHOLD` | CRL renewal threshold in seconds before `nextUpdate` |
-| `PKI_HOST` | Hostname of the web server that publishes AIA/CDP artifacts |
-| `PKI_TARGETS` | One or multiple rsync targets for publishing public CA artifacts and CRLs |
+| `CDP_HOST` | Hostname of the web server that publishes AIA/CDP artifacts |
+| `PUB_TARGETS` | One or multiple rsync targets for publishing public CA artifacts and CRLs |
 | `TRUST_ANCHORS` | CA slugs included in the generated trust manifest |
 | `BASE_URL` | Public base URL used for AIA, CDP, and manifest generation |
 | `DEFAULT_BITS` | Default RSA key length used by OpenSSL configuration files |
@@ -227,8 +227,8 @@ Important settings include:
 | `P384` | OpenSSL `genpkey` algorithm alias for NIST P-384 |
 | `P521` | OpenSSL `genpkey` algorithm alias for NIST P-521 |
 | `RSA` | OpenSSL `genpkey` algorithm alias for RSA with `DEFAULT_BITS` |
-| `CAK_ALG` | CA private key algorithm |
-| `CPK_ALG` | End-entity private key algorithm |
+| `CA_KEY_ALGORITHM` | CA private key algorithm |
+| `CRT_KEY_ALGORITHM` | End-entity private key algorithm |
 
 Example CA hierarchy configuration:
 
@@ -242,9 +242,9 @@ ALL_CA     := $(ROOT_CA) $(SIGNING_CA) $(ISSUING_CA)
 Example PKI publishing configuration:
 
 ```makefile
-PKI_HOST    := pki.example.com
-PKI_TARGETS := $(PKI_HOST):/var/www/pki
-BASE_URL    := https://$(PKI_HOST)
+CDP_HOST    := pki.example.com
+PUB_TARGETS := $(CDP_HOST):/var/www/pki
+BASE_URL    := http://$(CDP_HOST)
 ```
 
 Example trust manifest configuration:
@@ -412,16 +412,16 @@ make publish-check
 make publish
 ```
 
-`publish-check` performs an rsync dry-run to all configured `PKI_TARGETS`.
+`publish-check` performs an rsync dry-run to all configured `PUB_TARGETS`.
 
-`publish` synchronizes `pub/` to all configured `PKI_TARGETS`.
+`publish` synchronizes `pub/` to all configured `PUB_TARGETS`.
 
-`PKI_HOST` is also used to derive `BASE_URL`, which is consumed by the generated trust manifest and by AIA/CDP references in the OpenSSL configuration.
+`CDP_HOST` is also used to derive `BASE_URL`, which is consumed by the generated trust manifest and by AIA/CDP references in the OpenSSL configuration.
 
 ### Create an Ed25519 TLS server certificate
 
 ```bash
-CPK_ALG=ED25519 make certs/component-ca/server/test.example.com
+CRT_KEY_ALGORITHM=ED25519 make certs/component-ca/server/test.example.com
 ```
 
 ## Operational notes

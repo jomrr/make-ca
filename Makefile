@@ -86,9 +86,9 @@ sid		= $(call prt,3)
 # stem archive
 arc		= $(subst /,-,$*)
 
-# publish helper functions for multiple targets in PKI_TARGETS
-publish_pub	= $(foreach tgt,$(PKI_TARGETS),$(RSYNC) pub/ $(tgt);)
-publish_check	= $(foreach tgt,$(PKI_TARGETS),$(RSYNC) --dry-run pub/ $(tgt);)
+# publish helper functions for multiple targets in PUB_TARGETS
+publish_pub	= $(foreach tgt,$(PUB_TARGETS),$(RSYNC) pub/ $(tgt);)
+publish_check	= $(foreach tgt,$(PUB_TARGETS),$(RSYNC) --dry-run pub/ $(tgt);)
 
 # -----------------------------------------------------------------------------
 # Special make behavior
